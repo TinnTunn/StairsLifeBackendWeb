@@ -1,0 +1,282 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model announcements {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title      String    @db.VarChar(255)
+  body       String
+  target     String    @default("all") @db.VarChar(50)
+  sent_by    String?   @db.Uuid
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  users      users?    @relation(fields: [sent_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model applications {
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  project_id           String              @db.Uuid
+  student_id           String              @db.Uuid
+  cover_letter         String
+  estimated_completion DateTime            @db.Date
+  offered_budget       Int?
+  status               application_status? @default(pending)
+  created_at           DateTime?           @default(now()) @db.Timestamptz(6)
+  projects             projects            @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                users               @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  contracts            contracts[]
+
+  @@unique([project_id, student_id])
+}
+
+model contracts {
+  id                                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  project_id                         String           @db.Uuid
+  student_id                         String           @db.Uuid
+  business_id                        String           @db.Uuid
+  application_id                     String           @db.Uuid
+  agreed_budget                      Int
+  deadline                           DateTime         @db.Date
+  status                             contract_status? @default(active)
+  progress_pct                       Int?             @default(0)
+  deliverable_url                    String?
+  deliverable_notes                  String?
+  started_at                         DateTime?        @default(now()) @db.Timestamptz(6)
+  completed_at                       DateTime?        @db.Timestamptz(6)
+  created_at                         DateTime?        @default(now()) @db.Timestamptz(6)
+
+  applications                       applications     @relation(fields: [application_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_contracts_business_idTousers users            @relation("contracts_business_idTousers", fields: [business_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  projects                           projects         @relation(fields: [project_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_contracts_student_idTousers  users            @relation("contracts_student_idTousers", fields: [student_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  disputes                           disputes[]
+  messages                           messages[]
+  payments                           payments[]
+  reviews                            reviews[]
+  contract_deliverables              contract_deliverables[]
+}
+
+model disputes {
+  id                                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contract_id                       String    @db.Uuid
+  opened_by                         String    @db.Uuid
+  reason                            String
+  evidence_url                      String?
+  status                            String?   @default("open") @db.VarChar(50)
+  admin_notes                       String?
+  resolved_by                       String?   @db.Uuid
+  created_at                        DateTime? @default(now()) @db.Timestamptz(6)
+  resolved_at                       DateTime? @db.Timestamptz(6)
+  contracts                         contracts @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_disputes_opened_byTousers   users     @relation("disputes_opened_byTousers", fields: [opened_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_disputes_resolved_byTousers users?    @relation("disputes_resolved_byTousers", fields: [resolved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model messages {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contract_id    String    @db.Uuid
+  sender_id      String    @db.Uuid
+  content        String
+  attachment_url String?
+  is_read        Boolean?  @default(false)
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  contracts      contracts @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users          users     @relation(fields: [sender_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model payments {
+  id                             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contract_id                    String          @db.Uuid
+  amount                         Int
+  platform_fee                   Int             @default(0)
+  net_amount                     Int
+  status                         payment_status? @default(pending)
+  payer_id                       String?         @db.Uuid
+  payee_id                       String?         @db.Uuid
+  held_at                        DateTime?       @db.Timestamptz(6)
+  released_at                    DateTime?       @db.Timestamptz(6)
+  created_at                     DateTime?       @default(now()) @db.Timestamptz(6)
+  contracts                      contracts       @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_payments_payee_idTousers users?          @relation("payments_payee_idTousers", fields: [payee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_payments_payer_idTousers users?          @relation("payments_payer_idTousers", fields: [payer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model projects {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title           String          @db.VarChar(500)
+  description     String
+  budget_min      Int
+  budget_max      Int
+  deadline        DateTime        @db.Date
+  category        String          @db.VarChar(100)
+  tier            user_tier
+  skills          String[]
+  deliverables    String?
+  status          project_status? @default(open)
+  business_id     String          @db.Uuid
+  applicant_count Int?            @default(0)
+  created_at      DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?       @default(now()) @db.Timestamptz(6)
+  applications    applications[]
+  contracts       contracts[]
+  users           users           @relation(fields: [business_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model reviews {
+  id                               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contract_id                      String    @db.Uuid
+  reviewer_id                      String    @db.Uuid
+  reviewee_id                      String    @db.Uuid
+  rating                           Int?
+  comment                          String?
+  tags                             String[]
+  created_at                       DateTime? @default(now()) @db.Timestamptz(6)
+
+  contracts                        contracts @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_reviews_reviewee_idTousers users     @relation("reviews_reviewee_idTousers", fields: [reviewee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_reviews_reviewer_idTousers users     @relation("reviews_reviewer_idTousers", fields: [reviewer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([contract_id, reviewer_id])
+}
+
+model users {
+  id                                             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  full_name                                      String          @db.VarChar(255)
+  email                                          String          @unique @db.VarChar(255)
+  password_hash                                  String
+  role                                           user_role
+  tier                                           user_tier?      @default(pemula)
+  is_verified                                    Boolean?        @default(false)
+  avatar_url                                     String?
+  bio                                            String?
+  university                                     String?         @db.VarChar(255)
+  major                                          String?         @db.VarChar(255)
+  semester                                       Int?
+  phone                                          String?         @db.VarChar(20)
+  company_name                                   String?         @db.VarChar(255)
+  business_type                                  String?         @db.VarChar(100)
+  location                                       String?         @db.VarChar(255)
+  skills                                         String[]
+  portfolio_url                                  String?
+  rating_avg                                     Decimal?        @default(0) @db.Decimal(3, 2)
+  total_projects                                 Int?            @default(0)
+  created_at                                     DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at                                     DateTime?       @default(now()) @db.Timestamptz(6)
+  is_suspended                                   Boolean?        @default(false)
+  suspension_reason                              String?
+  announcements                                  announcements[]
+  applications                                   applications[]
+  contracts_contracts_business_idTousers         contracts[]     @relation("contracts_business_idTousers")
+  contracts_contracts_student_idTousers          contracts[]     @relation("contracts_student_idTousers")
+  disputes_disputes_opened_byTousers             disputes[]      @relation("disputes_opened_byTousers")
+  disputes_disputes_resolved_byTousers           disputes[]      @relation("disputes_resolved_byTousers")
+  messages                                       messages[]
+  payments_payments_payee_idTousers              payments[]      @relation("payments_payee_idTousers")
+  payments_payments_payer_idTousers              payments[]      @relation("payments_payer_idTousers")
+  projects                                       projects[]
+  reviews_reviews_reviewee_idTousers             reviews[]       @relation("reviews_reviewee_idTousers")
+  reviews_reviews_reviewer_idTousers             reviews[]       @relation("reviews_reviewer_idTousers")
+  contract_deliverables                          contract_deliverables[]
+  verifications_verifications_reviewed_byTousers verifications[] @relation("verifications_reviewed_byTousers")
+  verifications_verifications_user_idTousers     verifications?  @relation("verifications_user_idTousers")
+  support_messages                               support_messages[]
+}
+
+model verifications {
+  id                                     String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                                String               @unique @db.Uuid
+  ktm_image_url                          String
+  university                             String               @db.VarChar(255)
+  student_id_number                      String?              @db.VarChar(50)
+  status                                 verification_status? @default(pending)
+  reviewed_by                            String?              @db.Uuid
+  rejection_reason                       String?
+  submitted_at                           DateTime?            @default(now()) @db.Timestamptz(6)
+  reviewed_at                            DateTime?            @db.Timestamptz(6)
+  users_verifications_reviewed_byTousers users?               @relation("verifications_reviewed_byTousers", fields: [reviewed_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_verifications_user_idTousers     users                @relation("verifications_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model contract_deliverables {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contract_id       String    @db.Uuid
+  deliverable_url   String
+  deliverable_notes String?
+  status            String?   @default("pending") @db.VarChar(50)
+  rejection_reason  String?
+  submitted_at      DateTime? @default(now()) @db.Timestamptz(6)
+  reviewed_at       DateTime? @db.Timestamptz(6)
+  reviewed_by       String?   @db.Uuid
+  contracts         contracts @relation(fields: [contract_id], references: [id], onDelete: Cascade)
+  users             users?    @relation(fields: [reviewed_by], references: [id])
+}
+
+model support_messages {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  room_id     String    @db.VarChar(255)
+  sender_id   String?   @db.Uuid
+  content     String
+  sender_role String?   @default("user") @db.VarChar(50)
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  users       users?    @relation(fields: [sender_id], references: [id])
+}
+
+model platform_settings {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key        String    @unique @db.VarChar(100)
+  value      String
+  updated_at DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+enum application_status {
+  pending
+  shortlisted
+  approved
+  rejected
+}
+
+enum contract_status {
+  active
+  pending_review
+  completed
+  disputed
+}
+
+enum payment_status {
+  pending
+  held
+  released
+  refunded
+}
+
+enum project_status {
+  open
+  inProgress
+  completed
+  disputed
+  cancelled
+}
+
+enum user_role {
+  mahasiswa
+  bisnis
+  admin
+}
+
+enum user_tier {
+  pemula
+  menengah
+  mahir
+}
+
+enum verification_status {
+  pending
+  approved
+  rejected
+}
