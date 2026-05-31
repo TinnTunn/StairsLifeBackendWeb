@@ -1,0 +1,19 @@
+# Normalize line endings across platforms.
+# Mencegah inkonsistensi CRLF/LF antar developer Windows & Unix.
+* text=auto eol=lf
+
+# Files yang harus tetap LF (script shell, dll)
+*.sh        text eol=lf
+*.ts        text eol=lf
+*.js        text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.prisma    text eol=lf
+
+# Binary files
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.pdf       binary
