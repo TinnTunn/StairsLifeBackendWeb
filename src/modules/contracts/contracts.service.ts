@@ -41,16 +41,18 @@ export class ContractsService {
     if (application.status !== 'approved')
       throw new BadRequestException('Lamaran harus di-approve dulu');
 
-    // Guard: cegah double contract untuk 1 application_id.
-    // Ini penyebab duplikasi yang terjadi sebelumnya saat user klik 2x.
+    // Idempotent: kalau kontrak untuk application_id ini SUDAH ADA, kembalikan
+    // yang ada — JANGAN error. Ini mencegah double-contract (klik 2x) sekaligus
+    // membuat alur bisa dilanjutkan: mis. kontrak sudah dibuat tapi pembayaran
+    // Xendit belum selesai → bisnis bisa "Bayar ulang" tanpa buntu.
     const existingContract = await this.prisma.contracts.findFirst({
       where: { application_id: dto.application_id },
-      select: { id: true },
     });
     if (existingContract) {
-      throw new BadRequestException(
-        'Kontrak untuk lamaran ini sudah ada. Lamaran sudah disetujui, silakan ulangi pembuatan kontrak.',
-      );
+      return {
+        data: existingContract,
+        message: 'Kontrak sudah ada, lanjut ke pembayaran',
+      };
     }
 
     const contract = await this.contractsRepository.create({
