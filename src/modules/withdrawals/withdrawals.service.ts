@@ -89,6 +89,24 @@ export class WithdrawalsService {
 
     // Lock saldo via $transaction
     const withdrawal = await this.prisma.$transaction(async (tx) => {
+      // Lock saldo ATOMIK: kurangi hanya bila saldo masih cukup pada saat
+      // UPDATE dijalankan. Cek `Number(wallet.amount) < dto.amount` di atas
+      // bisa balapan (TOCTOU) — dua permintaan konkuren sama-sama lolos lalu
+      // membuat saldo negatif. `WHERE amount >= X` menutup celah itu.
+      const locked = await tx.wallets.updateMany({
+        where: { id: wallet.id, amount: { gte: dto.amount } },
+        data: {
+          amount: { decrement: dto.amount },
+          pending_amount: { increment: dto.amount },
+          updated_at: new Date(),
+        },
+      });
+      if (locked.count === 0) {
+        throw new BadRequestException(
+          'Saldo tidak cukup atau berubah. Muat ulang halaman lalu coba lagi.',
+        );
+      }
+
       const wd = await tx.withdrawals.create({
         data: {
           user_id: userId,
@@ -97,16 +115,6 @@ export class WithdrawalsService {
           admin_fee: this.adminFee,
           amount_net: amountNet,
           status: 'pending',
-        },
-      });
-
-      // Lock saldo: amount → pending_amount
-      await tx.wallets.update({
-        where: { id: wallet.id },
-        data: {
-          amount: { decrement: dto.amount },
-          pending_amount: { increment: dto.amount },
-          updated_at: new Date(),
         },
       });
 

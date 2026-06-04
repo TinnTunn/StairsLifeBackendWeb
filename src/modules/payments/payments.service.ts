@@ -97,6 +97,13 @@ export class PaymentsService {
     if (contract.business_id !== businessId) {
       throw new ForbiddenException('Hanya pemilik kontrak yang bisa bayar');
     }
+    // Hanya kontrak yang masih berjalan yang boleh ditagih. Mencegah buat
+    // invoice untuk kontrak completed/cancelled/dispute.
+    if (!['active', 'pending_review'].includes(String(contract.status))) {
+      throw new BadRequestException(
+        `Kontrak berstatus ${contract.status} tidak bisa dibayar`,
+      );
+    }
 
     // 2. Cek payment existing untuk kontrak ini
     const existing = await this.paymentsRepository.findByContractId(
@@ -327,6 +334,22 @@ export class PaymentsService {
   ): Promise<void> {
     const paidAt = payload.paid_at ? new Date(payload.paid_at) : new Date();
 
+    // Defense-in-depth: verifikasi nominal yang BENAR-BENAR dibayar tidak
+    // kurang dari yang ditagih. Invoice Xendit ber-nominal tetap, tapi ini
+    // menutup partial-payment / payload yang dimanipulasi.
+    const current = await this.prisma.payments.findUnique({
+      where: { id: paymentId },
+    });
+    const paid = payload.paid_amount ?? payload.amount;
+    if (current && typeof paid === 'number' && paid < current.amount) {
+      this.logger.error(
+        `Underpayment inv=${payload.id}: dibayar ${paid} < ditagih ${current.amount}. Tidak ditandai held.`,
+      );
+      return;
+    }
+    // Merge payload lama (dari createInvoice) supaya jejak audit tidak hilang.
+    const prevPayload = (current?.xendit_payload as Record<string, any>) || {};
+
     const payment = await this.prisma.payments.update({
       where: { id: paymentId },
       data: {
@@ -335,13 +358,8 @@ export class PaymentsService {
         held_at: new Date(),
         payment_method: payload.payment_method || null,
         payment_channel: payload.payment_channel || null,
-        // Merge payload ke yang sudah ada (yang dari createInvoice).
-        // JSONB di Postgres — kita simpan webhook payload terpisah supaya
-        // create-response (di kunci 'invoice_created') dan webhook
-        // (di kunci 'invoice_paid') keduanya ada untuk audit.
-        xendit_payload: {
-          invoice_paid: payload as any,
-        } as any,
+        // Simpan webhook PAID di kunci terpisah, pertahankan data create.
+        xendit_payload: { ...prevPayload, invoice_paid: payload as any } as any,
       },
       include: {
         contracts: {
@@ -407,12 +425,11 @@ export class PaymentsService {
    * untuk: (a) testing tanpa Xendit, (b) admin override manual saat
    * Xendit down / bisnis transfer langsung.
    */
-  async holdEscrow(dto: CreatePaymentDto, businessId: string) {
+  async holdEscrow(dto: CreatePaymentDto, _adminId: string) {
     const contract = await this.contractsRepository.findById(dto.contract_id);
     if (!contract) throw new NotFoundException('Kontrak tidak ditemukan');
-    if (contract.business_id !== businessId) {
-      throw new ForbiddenException('Hanya pemilik kontrak yang bisa bayar');
-    }
+    // Endpoint @Roles('admin'): payer = pemilik kontrak (bisnis), payee =
+    // mahasiswa. Caller (admin) hanya pemicu override, bukan pembayar.
 
     const existing = await this.paymentsRepository.findByContractId(
       dto.contract_id,
@@ -436,7 +453,7 @@ export class PaymentsService {
       platform_fee: platformFee,
       net_amount: netAmount,
       status: 'held',
-      payer_id: businessId,
+      payer_id: contract.business_id,
       payee_id: contract.student_id,
       held_at: new Date(),
       created_at: new Date(),
@@ -490,6 +507,19 @@ export class PaymentsService {
 
     const releasedAt = new Date();
     const updated = await this.prisma.$transaction(async (tx) => {
+      // Kunci baris payment & baca status TERKINI di dalam transaksi.
+      // Transaksi konkuren (mis. auto-release approveDeliverable) akan BLOCK
+      // di sini lalu melihat status sudah 'released' → tidak double-credit.
+      const rows = await tx.$queryRaw<
+        Array<{ status: string; net_amount: number; payee_id: string }>
+      >`SELECT status, net_amount, payee_id FROM payments
+        WHERE id = ${paymentId}::uuid FOR UPDATE`;
+      const row = rows[0];
+      if (!row || row.status !== 'held') {
+        // Sudah dirilis pihak lain di antara pengecekan & transaksi — no-op.
+        return null;
+      }
+
       // 1. Update payment
       const upd = await tx.payments.update({
         where: { id: paymentId },
@@ -497,8 +527,7 @@ export class PaymentsService {
       });
 
       // 2. Update wallet mahasiswa
-      const studentId = payment.payee_id!;
-      await this._addToWallet(tx, studentId, payment.net_amount, {
+      await this._addToWallet(tx, row.payee_id, row.net_amount, {
         type: 'earn_release',
         ref_type: 'payment',
         ref_id: paymentId,
@@ -507,6 +536,14 @@ export class PaymentsService {
 
       return upd;
     });
+
+    // Race terdeteksi di dalam transaksi (sudah dirilis) → kembalikan idempoten.
+    if (!updated) {
+      return {
+        data: payment,
+        message: `Dana Rp ${payment.net_amount.toLocaleString('id-ID')} sudah dicairkan ke mahasiswa`,
+      };
+    }
 
     void this.notificationsService.create({
       user_id: payment.payee_id!,

@@ -128,8 +128,9 @@ export class XenditService {
       this.logger.error(
         `[Xendit ${method} ${path}] ${resp.status} ${code}: ${message}`,
       );
+      // Ke klien: cukup kode (enum aman), jangan teruskan pesan mentah gateway.
       throw new InternalServerErrorException(
-        `Xendit error (${code}): ${message}`,
+        `Gateway pembayaran menolak permintaan (${code}). Coba lagi nanti.`,
       );
     }
 

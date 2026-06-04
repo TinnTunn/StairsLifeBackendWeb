@@ -142,6 +142,8 @@ model payments {
   users_payments_payee_idTousers users?          @relation("payments_payee_idTousers", fields: [payee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   users_payments_payer_idTousers users?          @relation("payments_payer_idTousers", fields: [payer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  // 1 kontrak = 1 payment. Mencegah 2 createInvoice konkuren membuat 2 invoice.
+  @@unique([contract_id])
   @@index([status, created_at(sort: Desc)])
   @@index([xendit_invoice_id])
 }
@@ -418,6 +420,10 @@ model wallet_transactions {
   created_at  DateTime @default(now()) @db.Timestamptz(6)
   wallet      wallets  @relation(fields: [wallet_id], references: [id], onDelete: Cascade)
 
+  // Idempotency-key: 1 (entity, id, aksi) hanya boleh tercatat sekali.
+  // Insert kedua (mis. double-credit earn_release) melempar P2002 → transaksi
+  // rollback → tidak ada increment ganda. Backstop level-DB lintas semua jalur.
+  @@unique([ref_type, ref_id, type])
   @@index([wallet_id, created_at(sort: Desc)])
 }
 

@@ -95,11 +95,14 @@ export class PaymentsController {
     return this.paymentsService.syncPaymentWithXendit(id, user.id);
   }
 
-  // ─── LEGACY MANUAL ESCROW (admin override / fallback) ─────
+  // ─── MANUAL ESCROW (ADMIN OVERRIDE saja) ──────────────────
   // POST /api/v1/payments/escrow
+  // SECURITY: dulu @Roles('bisnis') — bisnis mana pun bisa menandai escrow
+  // 'held' TANPA pembayaran nyata (phantom money) → dicairkan ke wallet
+  // student. Sekarang dikunci ke admin. Flow pembayaran normal = createInvoice.
   @Post('escrow')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('bisnis')
+  @Roles('admin')
   async holdEscrow(
     @Body() dto: CreatePaymentDto,
     @CurrentUser() user: JwtUser,

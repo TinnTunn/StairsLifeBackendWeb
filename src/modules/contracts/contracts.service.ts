@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { ContractsRepository } from './contracts.repository';
 import { ApplicationsRepository } from '../applications/applications.repository';
@@ -14,6 +15,8 @@ import { UploadDeliverableDto } from './dto/upload-deliverable.dto';
 
 @Injectable()
 export class ContractsService {
+  private readonly logger = new Logger(ContractsService.name);
+
   constructor(
     private contractsRepository: ContractsRepository,
     private applicationsRepository: ApplicationsRepository,
@@ -180,11 +183,21 @@ export class ContractsService {
         'Kontrak tidak dalam status pending review',
       );
 
-    const updated = await this.contractsRepository.update(id, {
-      status: 'completed',
-      progress_pct: 100,
-      completed_at: new Date(),
+    // Transisi atomik: hanya SATU pemanggil konkuren yang menang. Mencegah
+    // double-effect (total_projects ganda, tier ganda, escrow dirilis ganda)
+    // akibat klik-ganda / retry "Approve".
+    const claimed = await this.prisma.contracts.updateMany({
+      where: { id, status: 'pending_review' as any },
+      data: {
+        status: 'completed' as any,
+        progress_pct: 100,
+        completed_at: new Date(),
+      },
     });
+    if (claimed.count === 0) {
+      throw new BadRequestException('Kontrak tidak dalam status pending review');
+    }
+    const updated = await this.contractsRepository.findById(id);
 
     // Update history deliverable terakhir jadi approved
     await this.prisma.contract_deliverables.updateMany({
@@ -227,10 +240,14 @@ export class ContractsService {
     let releasedNetAmount = 0;
     try {
       await this.prisma.$transaction(async (tx) => {
-        // Cari semua payment 'held' untuk kontrak ini (biasanya 1)
-        const heldPayments = await tx.payments.findMany({
-          where: { contract_id: id, status: 'held' as any },
-        });
+        // Kunci baris 'held' milik kontrak ini (FOR UPDATE). Transaksi konkuren
+        // (mis. manual releaseEscrow) akan BLOCK lalu melihat status sudah
+        // 'released' → 0 baris → tidak meng-kredit wallet dua kali.
+        const heldPayments = await tx.$queryRaw<
+          Array<{ id: string; net_amount: number }>
+        >`SELECT id, net_amount FROM payments
+          WHERE contract_id = ${id}::uuid AND status = 'held'
+          FOR UPDATE`;
         if (heldPayments.length === 0) return;
 
         // Update status semuanya
@@ -279,7 +296,9 @@ export class ContractsService {
         escrowReleased = true;
       });
     } catch (e) {
-      console.warn('[approveDeliverable] auto-release escrow failed:', e);
+      this.logger.error(
+        `[approveDeliverable] auto-release escrow gagal untuk kontrak ${id}: ${(e as Error).message}`,
+      );
     }
 
     const project = await this.projectsRepository.findById(contract.project_id);

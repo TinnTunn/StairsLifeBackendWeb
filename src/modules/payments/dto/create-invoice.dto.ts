@@ -1,4 +1,4 @@
-import { IsUUID, IsNumber, IsOptional, Min } from 'class-validator';
+import { IsUUID, IsInt, IsNumber, IsOptional, Min, Max } from 'class-validator';
 
 /**
  * DTO untuk endpoint POST /payments/invoice — bisnis trigger pembayaran
@@ -17,8 +17,9 @@ export class CreateInvoiceDto {
    * Total yang ditagih (gross, sebelum potongan fee).
    * Backend yang akan hitung platform_fee & net_amount dari settings.
    */
-  @IsNumber()
+  @IsInt() // wajib bilangan bulat — kolom payments.amount = Int, fee/net dihitung dari sini
   @Min(10_000) // minimum Rp 10.000 (Xendit hard min Rp 1.500 untuk QRIS, kita pakai 10k untuk safety)
+  @Max(100_000_000) // selaras dgn cap FE; jauh di bawah ceiling Int (~Rp 2,1 M)
   amount: number;
 
   /**

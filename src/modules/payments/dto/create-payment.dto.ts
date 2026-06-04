@@ -1,6 +1,6 @@
 import {
   IsUUID,
-  IsNumber,
+  IsInt,
   IsOptional,
   IsString,
   Min,
@@ -15,8 +15,8 @@ export class CreatePaymentDto {
   @IsUUID()
   contract_id: string;
 
-  @IsNumber()
-  @Min(0)
+  @IsInt()
+  @Min(10_000) // tolak 0/negatif — escrow manual harus nominal nyata
   amount: number;
 
   // URL bukti transfer manual (legacy).

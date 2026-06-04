@@ -5,6 +5,13 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import * as express from 'express';
 
+// BigInt → number saat JSON.stringify. Kolom wallet/wallet_transactions pakai
+// BigInt; tanpa patch ini endpoint yang mengembalikan BigInt mentah akan 500
+// ("Do not know how to serialize a BigInt"). IDR < 2^53 jadi aman tanpa presisi hilang.
+(BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
+
 /**
  * Bangun daftar origin yang diizinkan untuk CORS.
  * - FRONTEND_URL bisa berisi multiple origin dipisah koma.
