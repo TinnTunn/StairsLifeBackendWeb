@@ -56,7 +56,28 @@ export class ChatController {
       .or(`student_id.eq.${user.id},business_id.eq.${user.id}`)
       .order('created_at', { ascending: false });
 
-    return { data: contracts || [], message: 'Berhasil' };
+    // Enrich tiap kontrak dengan pesan terakhir (untuk tampilan ala WhatsApp:
+    // snippet + urut terbaru). Satu query saja (bukan N+1).
+    const list = contracts || [];
+    const ids = list.map((c: any) => c.id);
+    const lastMsg: Record<string, any> = {};
+    if (ids.length) {
+      const { data: msgs } = await supabase
+        .from('messages')
+        .select('contract_id, content, created_at, sender_id')
+        .in('contract_id', ids)
+        .order('created_at', { ascending: false });
+      for (const m of msgs || []) {
+        if (!lastMsg[m.contract_id]) lastMsg[m.contract_id] = m; // pertama = terbaru
+      }
+    }
+    const enriched = list.map((c: any) => ({
+      ...c,
+      last_message: lastMsg[c.id]?.content ?? null,
+      last_message_at: lastMsg[c.id]?.created_at ?? null,
+    }));
+
+    return { data: enriched, message: 'Berhasil' };
   }
 
   @Get('support')
