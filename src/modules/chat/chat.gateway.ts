@@ -119,6 +119,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       } as Record<string, string>;
 
       this.connectedUsers.set(client.id, userId);
+      // Personal room untuk push inbox real-time (badge unread + sort daftar)
+      // walau user belum membuka room kontrak tertentu.
+      void client.join(`user:${userId}`);
       this.logger.log(`Connected: ${userId} (socket: ${client.id})`);
     } catch {
       client.emit('error', { message: 'Autentikasi gagal' });
@@ -209,6 +212,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     if (!userId) throw new WsException('Tidak terautentikasi');
     if (!content?.trim()) throw new WsException('Pesan tidak boleh kosong');
+    if (content.length > 5000) {
+      throw new WsException('Pesan terlalu panjang (maks 5000 karakter)');
+    }
 
     const hasAccess = await this.chatService.validateContractAccess(
       contractId,
@@ -230,6 +236,25 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       contractId,
       message,
     });
+
+    // Push inbox ke PENERIMA (lawan) walau dia belum join room ini — supaya
+    // daftar chat-nya update real-time: badge unread bertambah + pindah ke atas.
+    const parties = await this.chatService.getContractParties(contractId);
+    if (parties) {
+      const recipientId =
+        parties.student_id === userId
+          ? parties.business_id
+          : parties.student_id;
+      if (recipientId && recipientId !== userId) {
+        this.server.to(`user:${recipientId}`).emit('chat_inbox', {
+          contractId,
+          preview: content.trim().slice(0, 140),
+          senderName:
+            (client.data as Record<string, string>).userName || 'Seseorang',
+          created_at: (message as { created_at?: string }).created_at,
+        });
+      }
+    }
 
     this.logger.log(`Message in ${roomName} from ${userId}`);
   }

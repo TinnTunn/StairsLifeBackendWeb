@@ -23,7 +23,13 @@ const ALLOWED_EXT_DELIVERABLE =
 const MAX_SIZE_DEFAULT     = 10 * 1024 * 1024; // 10 MB
 const MAX_SIZE_DELIVERABLE = 50 * 1024 * 1024; // 50 MB
 
-const VALID_TYPES: UploadType[] = ['avatar', 'ktm', 'selfie', 'deliverable'];
+const VALID_TYPES: UploadType[] = [
+  'avatar',
+  'ktm',
+  'selfie',
+  'deliverable',
+  'evidence',
+];
 
 @Controller('upload')
 @UseGuards(JwtAuthGuard)

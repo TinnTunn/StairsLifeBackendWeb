@@ -8,6 +8,7 @@ import {
   Min,
   Max,
   MinLength,
+  MaxLength,
 } from 'class-validator';
 
 /**
@@ -35,6 +36,7 @@ export class RegisterDto {
 
   @IsString()
   @MinLength(8, { message: 'Password minimal 8 karakter' })
+  @MaxLength(128, { message: 'Password maksimal 128 karakter' })
   password: string;
 
   @IsEnum(PublicUserRole, {

@@ -172,6 +172,22 @@ export class ApplicationsService {
 
     // Cek status lama vs baru — jangan notif kalau sama (idempotent re-approve)
     const previousStatus = application.status;
+
+    // Integritas "1 project = 1 mahasiswa": cegah approve lamaran LAIN saat
+    // project sudah punya kontrak (kandidat terpilih). Re-approve lamaran yang
+    // SAMA (kontrak sudah dibuat untuk lamaran ini) tetap diizinkan (idempotent).
+    if (dto.status === 'approved' && previousStatus !== 'approved') {
+      const existingContract = await this.prisma.contracts.findFirst({
+        where: { project_id: application.project_id },
+        select: { application_id: true },
+      });
+      if (existingContract && existingContract.application_id !== id) {
+        throw new BadRequestException(
+          'Project ini sudah punya kandidat terpilih. Tidak bisa menerima lamaran lain.',
+        );
+      }
+    }
+
     const updated = await this.applicationsRepository.updateStatus(
       id,
       dto.status,

@@ -46,7 +46,10 @@ export class TokenService {
     }
     this.refreshSecret = refresh ?? access;
 
-    this.accessExpiresIn = this.config.get<string>('JWT_EXPIRES_IN') ?? '7d';
+    // Default pendek: access token stateless tak bisa di-revoke, jadi TTL
+    // pendek membatasi paparan token bocor / user suspended. Refresh (30d)
+    // menangani UX; FE proactive-refresh sebelum expire. Override via env.
+    this.accessExpiresIn = this.config.get<string>('JWT_EXPIRES_IN') ?? '60m';
     this.refreshExpiresIn =
       this.config.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '30d';
   }

@@ -61,20 +61,26 @@ export class ChatController {
     const list = contracts || [];
     const ids = list.map((c: any) => c.id);
     const lastMsg: Record<string, any> = {};
+    const unreadCount: Record<string, number> = {};
     if (ids.length) {
       const { data: msgs } = await supabase
         .from('messages')
-        .select('contract_id, content, created_at, sender_id')
+        .select('contract_id, content, created_at, sender_id, is_read')
         .in('contract_id', ids)
         .order('created_at', { ascending: false });
       for (const m of msgs || []) {
         if (!lastMsg[m.contract_id]) lastMsg[m.contract_id] = m; // pertama = terbaru
+        // Belum dibaca = pesan dari LAWAN (bukan aku) yang is_read != true.
+        if (m.sender_id !== user.id && m.is_read !== true) {
+          unreadCount[m.contract_id] = (unreadCount[m.contract_id] || 0) + 1;
+        }
       }
     }
     const enriched = list.map((c: any) => ({
       ...c,
       last_message: lastMsg[c.id]?.content ?? null,
       last_message_at: lastMsg[c.id]?.created_at ?? null,
+      unread_count: unreadCount[c.id] || 0,
     }));
 
     return { data: enriched, message: 'Berhasil' };

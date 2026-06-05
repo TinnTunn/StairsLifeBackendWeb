@@ -23,6 +23,12 @@ interface RequestContext {
 
 @Injectable()
 export class AuthService {
+  // Hash bcrypt dummy (valid) untuk menyamakan waktu respons login saat user
+  // tidak ada / akun tanpa password — menutup user-enumeration via timing.
+  // Bukan rahasia; tidak pernah cocok dengan password user nyata.
+  private static readonly DUMMY_PASSWORD_HASH =
+    '$2b$12$xC/GOQFhxdafImNAcsj3deScfjdjgLoexlKOyAkshKVSV6U3T6yti';
+
   constructor(
     private supabaseService: SupabaseService,
     private prisma: PrismaService,
@@ -83,7 +89,15 @@ export class AuthService {
       .single();
 
     if (error) {
-      throw new BadRequestException(error.message);
+      // Race: dua register email sama berbarengan → unique violation di DB.
+      // Jangan teruskan pesan DB mentah (bocor internal + konfirmasi email ada).
+      if (
+        (error as any).code === '23505' ||
+        /duplicate|unique|already exists/i.test(error.message || '')
+      ) {
+        throw new ConflictException('Email sudah terdaftar');
+      }
+      throw new BadRequestException('Pendaftaran gagal. Silakan coba lagi.');
     }
 
     // Kirim email verifikasi (async, jangan block response).
@@ -117,6 +131,12 @@ export class AuthService {
       .eq('email', dto.email)
       .single();
 
+    // Selalu jalankan bcrypt (pakai dummy hash bila user tak ada / tanpa
+    // password) supaya waktu respons seragam → tidak bocorkan keberadaan email
+    // lewat timing. Pesan & urutan cek tetap sama seperti sebelumnya.
+    const hashToCheck = user?.password_hash || AuthService.DUMMY_PASSWORD_HASH;
+    const isPasswordValid = await bcrypt.compare(dto.password, hashToCheck);
+
     if (!user) {
       throw new UnauthorizedException('Email atau password salah');
     }
@@ -129,20 +149,22 @@ export class AuthService {
       );
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      dto.password,
-      user.password_hash,
-    );
-
     if (!isPasswordValid) {
       throw new UnauthorizedException('Email atau password salah');
     }
 
     if (user.is_suspended) {
+      // Error TERSTRUKTUR (JSON di field message) supaya FE bisa
+      // JSON.parse(error.message) → tampilkan modal banding (showSuspendedModal)
+      // dengan alasan + form "Hubungi Admin", bukan sekadar toast.
+      // Kontrak ini sudah diharapkan FE di scripts/core/auth.js (parsed.suspended).
       throw new UnauthorizedException(
-        user.suspension_reason
-          ? `Akun di-suspend: ${user.suspension_reason}`
-          : 'Akun di-suspend. Hubungi support.',
+        JSON.stringify({
+          suspended: true,
+          reason:
+            user.suspension_reason ||
+            'Melanggar ketentuan penggunaan platform.',
+        }),
       );
     }
 
@@ -175,6 +197,44 @@ export class AuthService {
     return {
       data: { user: userPayload, ...tokens },
       message: 'Login berhasil',
+    };
+  }
+
+  // ============================================================
+  // SUSPENSION APPEAL (publik — user suspended belum punya token)
+  // ============================================================
+
+  /**
+   * Suspended user (tidak bisa login) ajukan banding/konsultasi ke admin.
+   * Pesan disimpan ke support_messages room `support-{userId}` sehingga
+   * langsung muncul di inbox support admin (yang sudah menampilkan user
+   * suspended beserta riwayat chat-nya).
+   *
+   * SECURITY: hanya simpan kalau user ADA & memang suspended. Selalu balas
+   * pesan generik — tidak bocorkan keberadaan email / status akun.
+   */
+  async submitSuspensionAppeal(email: string, message: string) {
+    const supabase = this.supabaseService.getClient();
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, role, is_suspended')
+      .eq('email', email)
+      .single();
+
+    if (user && user.is_suspended) {
+      await supabase.from('support_messages').insert({
+        room_id: `support-${user.id}`,
+        sender_id: user.id,
+        content: message,
+        sender_role: user.role,
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    return {
+      data: null,
+      message:
+        'Pesan kamu sudah dikirim ke tim admin. Kami akan meninjau dan menghubungi kamu secepatnya.',
     };
   }
 

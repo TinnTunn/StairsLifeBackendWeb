@@ -6,6 +6,8 @@ import {
   IsArray,
   Min,
   Max,
+  MaxLength,
+  ArrayMaxSize,
 } from 'class-validator';
 
 export class CreateReviewDto {
@@ -19,10 +21,13 @@ export class CreateReviewDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000, { message: 'Komentar maksimal 2000 karakter' })
   comment?: string;
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(15, { message: 'Maksimal 15 tag' })
   @IsString({ each: true })
+  @MaxLength(40, { each: true, message: 'Tiap tag maksimal 40 karakter' })
   tags?: string[];
 }

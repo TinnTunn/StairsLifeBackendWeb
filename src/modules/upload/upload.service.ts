@@ -7,7 +7,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-export type UploadType = 'avatar' | 'ktm' | 'selfie' | 'deliverable';
+export type UploadType =
+  | 'avatar'
+  | 'ktm'
+  | 'selfie'
+  | 'deliverable'
+  | 'evidence';
 
 @Injectable()
 export class UploadService {
@@ -67,21 +72,45 @@ export class UploadService {
     requesterRole: string,
     expiresInSeconds = 3600,
   ): Promise<string> {
+    // Validasi bentuk path DULU (cegah traversal ../ & path aneh yang bisa
+    // mem-bypass cek owner di authorizeSignedUrlAccess).
+    this.validatePathFormat(path);
     await this.authorizeSignedUrlAccess(path, requesterId, requesterRole);
 
-    const bucket = path.startsWith('deliverables/')
+    const isPrivateDeliverable =
+      path.startsWith('deliverables/') || path.startsWith('evidence/');
+    const bucket = isPrivateDeliverable
       ? this.DELIVERABLE_BUCKET
       : this.PRIVATE_BUCKET;
 
     const { data, error } = await this.supabase.storage
       .from(bucket)
-      .createSignedUrl(path, expiresInSeconds);
+      .createSignedUrl(path, expiresInSeconds, {
+        // Paksa download untuk deliverable/evidence: tipe yang diizinkan
+        // termasuk SVG yang bisa XSS kalau di-render inline di tab. ktm/selfie
+        // (bucket verifikasi, hanya jpeg/png/webp) tetap inline untuk preview.
+        ...(isPrivateDeliverable ? { download: true } : {}),
+      });
 
     if (error || !data) {
       throw new InternalServerErrorException('Gagal membuat signed URL.');
     }
 
     return data.signedUrl;
+  }
+
+  /**
+   * Validasi bentuk path: `folder/{uuid}/{filename}`. Folder hanya yang
+   * dikenal, dan filename satu segmen (tanpa '/') sehingga '../' mustahil.
+   */
+  private validatePathFormat(path: string): void {
+    const ok =
+      /^(deliverables|ktm|selfie|evidence)\/[0-9a-fA-F-]{36}\/[A-Za-z0-9._-]+$/.test(
+        path,
+      );
+    if (!ok) {
+      throw new BadRequestException('Path file tidak valid.');
+    }
   }
 
   // ─── Cek authorization sebelum buat signed URL ────────────────
@@ -98,27 +127,68 @@ export class UploadService {
     const ownerId  = segments[1]; // userId
 
     if (folder === 'deliverables') {
-      // Student pemilik file
+      // Student pemilik file (uploader)
       if (requesterId === ownerId) return;
 
-      // Business owner yang punya contract dengan student tsb
-      const { data: contract } = await this.supabase
-        .from('contracts')
-        .select('id')
-        .eq('student_id', ownerId)
-        .eq('business_id', requesterId)
-        .limit(1)
-        .maybeSingle();
-
-      if (!contract) {
+      // Business: HANYA boleh kalau file ini benar-benar deliverable dari salah
+      // satu kontrak antara dia & student tsb. Sebelumnya cukup "pernah
+      // berkontrak dgn student ini" — itu membocorkan deliverable lintas-klien
+      // (bisnis A bisa lihat hasil kerja student utk bisnis B).
+      const allowed = await this.isDeliverableForBusiness(
+        path,
+        ownerId,
+        requesterId,
+      );
+      if (!allowed) {
         throw new ForbiddenException('Akses ditolak.');
       }
     } else {
-      // ktm / selfie → hanya pemilik
+      // ktm / selfie / evidence → hanya pemilik (admin sudah bypass di atas).
+      // Untuk evidence, admin = mediator dispute yang perlu lihat bukti.
       if (requesterId !== ownerId) {
         throw new ForbiddenException('Akses ditolak.');
       }
     }
+  }
+
+  /**
+   * True kalau `path` adalah deliverable dari kontrak antara studentId &
+   * businessId. Dicocokkan via contracts.deliverable_url (deliverable terakhir,
+   * bisa path tunggal atau JSON array) ATAU riwayat contract_deliverables.
+   * Menutup kebocoran deliverable lintas-klien.
+   */
+  private async isDeliverableForBusiness(
+    path: string,
+    studentId: string,
+    businessId: string,
+  ): Promise<boolean> {
+    // 1. Kontrak antara keduanya yang deliverable_url-nya mereferensikan path.
+    const { data: c1 } = await this.supabase
+      .from('contracts')
+      .select('id')
+      .eq('student_id', studentId)
+      .eq('business_id', businessId)
+      .like('deliverable_url', `%${path}%`)
+      .limit(1);
+    if (c1 && c1.length > 0) return true;
+
+    // 2. Riwayat: contract_deliverables yang mereferensikan path → pastikan
+    //    kontraknya milik business & student ini.
+    const { data: hist } = await this.supabase
+      .from('contract_deliverables')
+      .select('contract_id')
+      .like('deliverable_url', `%${path}%`);
+    if (!hist || hist.length === 0) return false;
+
+    const contractIds = hist.map((r: { contract_id: string }) => r.contract_id);
+    const { data: c2 } = await this.supabase
+      .from('contracts')
+      .select('id')
+      .in('id', contractIds)
+      .eq('student_id', studentId)
+      .eq('business_id', businessId)
+      .limit(1);
+    return !!(c2 && c2.length > 0);
   }
 
   // ─── Resolve bucket & path berdasarkan type ───────────────────
@@ -136,6 +206,9 @@ export class UploadService {
       deliverable: { bucket: this.DELIVERABLE_BUCKET, folder: `deliverables/${userId}` },
       ktm:         { bucket: this.PRIVATE_BUCKET,     folder: `ktm/${userId}` },
       selfie:      { bucket: this.PRIVATE_BUCKET,     folder: `selfie/${userId}` },
+      // Bukti dispute — bucket privat, hanya pemilik & admin (mediator) yang
+      // bisa minta signed URL (lihat authorizeSignedUrlAccess: cabang else).
+      evidence:    { bucket: this.DELIVERABLE_BUCKET, folder: `evidence/${userId}` },
     };
 
     const { bucket, folder } = routes[type];

@@ -9,7 +9,18 @@ describe('UploadService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UploadService,
-        { provide: ConfigService, useValue: { get: () => undefined } },
+        {
+          // UploadService memanggil createClient() di constructor — butuh URL
+          // & key valid (format saja, tanpa koneksi nyata) agar tidak throw
+          // "supabaseUrl is required".
+          provide: ConfigService,
+          useValue: {
+            get: (key: string) =>
+              key === 'SUPABASE_URL'
+                ? 'https://example.supabase.co'
+                : 'test-service-role-key',
+          },
+        },
       ],
     }).compile();
 

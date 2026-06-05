@@ -17,6 +17,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto, ResendVerificationDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { SuspendedAppealDto } from './dto/suspended-appeal.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -149,5 +150,26 @@ export class AuthController {
   })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.new_password);
+  }
+
+  // ====================================================
+  // SUSPENSION APPEAL (publik — suspended user belum punya token)
+  // ====================================================
+
+  /**
+   * POST /auth/suspended-appeal
+   * Body: { email, message }
+   *
+   * User yang akunnya disuspend (login diblokir) kirim banding/konsultasi ke
+   * admin. Throttle ketat. Selalu balas generik (anti enumeration).
+   */
+  @Post('suspended-appeal')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({
+    short: { ttl: 60_000, limit: 3 },
+    medium: { ttl: 60_000, limit: 3 },
+  })
+  async suspendedAppeal(@Body() dto: SuspendedAppealDto) {
+    return this.authService.submitSuspensionAppeal(dto.email, dto.message);
   }
 }

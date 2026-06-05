@@ -65,6 +65,22 @@ export class ChatService {
       .neq('sender_id', userId);
   }
 
+  /**
+   * Ambil kedua pihak kontrak (student & business) — dipakai gateway untuk
+   * menentukan penerima saat push notifikasi inbox real-time.
+   */
+  async getContractParties(
+    contractId: string,
+  ): Promise<{ student_id: string; business_id: string } | null> {
+    const { data } = await this.supabase
+      .getClient()
+      .from('contracts')
+      .select('student_id, business_id')
+      .eq('id', contractId)
+      .maybeSingle();
+    return (data as { student_id: string; business_id: string } | null) ?? null;
+  }
+
   async validateContractAccess(
     contractId: string,
     userId: string,

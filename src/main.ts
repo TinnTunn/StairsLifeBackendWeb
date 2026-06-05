@@ -44,6 +44,11 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
+  // Di belakang proxy Railway: percayai 1 hop supaya req.ip = IP klien asli
+  // (dari X-Forwarded-For). Tanpa ini, throttling per-IP kolaps jadi satu
+  // bucket global & ip_address audit token salah (= IP proxy).
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   // Increase payload limit untuk upload base64
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
