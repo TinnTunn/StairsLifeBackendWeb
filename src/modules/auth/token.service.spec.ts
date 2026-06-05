@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { TokenService } from './token.service';
