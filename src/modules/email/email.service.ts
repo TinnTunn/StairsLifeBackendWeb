@@ -30,7 +30,8 @@ export class EmailService {
   constructor(private config: ConfigService) {
     const apiKey = this.config.get<string>('RESEND_API_KEY');
     this.fromAddress =
-      this.config.get<string>('EMAIL_FROM') ?? 'StairsLife <noreply@example.com>';
+      this.config.get<string>('EMAIL_FROM') ??
+      'StairsLife <noreply@example.com>';
     this.appUrl =
       this.config.get<string>('APP_URL') ??
       this.config.get<string>('FRONTEND_URL') ??

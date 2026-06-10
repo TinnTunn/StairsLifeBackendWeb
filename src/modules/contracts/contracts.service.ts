@@ -136,9 +136,8 @@ export class ContractsService {
 
     // Simpan sebagai JSON array kalau > 1 file, plain string kalau 1 file
     // (backward compat dengan data lama yang simpan single URL).
-    const storedUrl = rawUrls.length === 1
-      ? rawUrls[0]
-      : JSON.stringify(rawUrls);
+    const storedUrl =
+      rawUrls.length === 1 ? rawUrls[0] : JSON.stringify(rawUrls);
 
     // Simpan ke history deliverables
     await this.prisma.contract_deliverables.create({
@@ -170,7 +169,6 @@ export class ContractsService {
     });
 
     return { data: updated, message: 'Deliverable berhasil diupload' };
-
   }
 
   async approveDeliverable(id: string, businessId: string) {
@@ -195,7 +193,9 @@ export class ContractsService {
       },
     });
     if (claimed.count === 0) {
-      throw new BadRequestException('Kontrak tidak dalam status pending review');
+      throw new BadRequestException(
+        'Kontrak tidak dalam status pending review',
+      );
     }
     const updated = await this.contractsRepository.findById(id);
 

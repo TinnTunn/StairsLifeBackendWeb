@@ -15,7 +15,10 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { ResetPasswordDto, ResendVerificationDto } from './dto/reset-password.dto';
+import {
+  ResetPasswordDto,
+  ResendVerificationDto,
+} from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { SuspendedAppealDto } from './dto/suspended-appeal.dto';
 
@@ -126,10 +129,7 @@ export class AuthController {
     short: { ttl: 60_000, limit: 3 },
     medium: { ttl: 60_000, limit: 3 },
   })
-  async forgotPassword(
-    @Body() dto: ForgotPasswordDto,
-    @Req() req: Request,
-  ) {
+  async forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
     return this.authService.forgotPassword(dto.email, {
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),

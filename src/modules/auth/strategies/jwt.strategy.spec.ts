@@ -29,7 +29,7 @@ describe('JwtStrategy.validate', () => {
       sub: 'u1',
       email: 'a@b.c',
       role: 'mahasiswa',
-    } as any);
+    });
     expect(user).toEqual({ id: 'u1', email: 'a@b.c', role: 'mahasiswa' });
   });
 });

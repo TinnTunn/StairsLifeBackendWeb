@@ -1,11 +1,4 @@
-import {
-  IsEnum,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 /**
  * Status final dispute setelah admin menelaah.
@@ -51,7 +44,8 @@ export class ResolveDisputeDto {
    */
   @IsOptional()
   @IsEnum(DisputeOutcome, {
-    message: 'outcome harus: favor_business | favor_student | split | no_action',
+    message:
+      'outcome harus: favor_business | favor_student | split | no_action',
   })
   outcome?: DisputeOutcome;
 

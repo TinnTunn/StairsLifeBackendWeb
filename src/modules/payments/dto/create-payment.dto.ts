@@ -1,10 +1,4 @@
-import {
-  IsUUID,
-  IsInt,
-  IsOptional,
-  IsString,
-  Min,
-} from 'class-validator';
+import { IsUUID, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 /**
  * DTO untuk legacy manual flow (upload bukti transfer).

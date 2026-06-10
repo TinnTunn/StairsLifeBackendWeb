@@ -41,7 +41,9 @@ export class AuditService {
         });
     } catch (e) {
       // Jangan ganggu alur utama kalau audit gagal.
-      this.logger.warn(`Gagal menulis audit log (${entry.action}): ${(e as Error).message}`);
+      this.logger.warn(
+        `Gagal menulis audit log (${entry.action}): ${(e as Error).message}`,
+      );
     }
   }
 

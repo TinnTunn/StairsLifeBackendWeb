@@ -22,9 +22,9 @@ export class PrismaService
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
       max: 10,
-      connectionTimeoutMillis: 10000,  // 10 detik timeout connect
-      idleTimeoutMillis: 30000,        // lepas idle setelah 30 detik
-      keepAlive: true,                 // cegah disconnect dari Supabase pooler
+      connectionTimeoutMillis: 10000, // 10 detik timeout connect
+      idleTimeoutMillis: 30000, // lepas idle setelah 30 detik
+      keepAlive: true, // cegah disconnect dari Supabase pooler
     });
 
     const adapter = new PrismaPg(pool);

@@ -28,7 +28,7 @@ export class UsersService {
       // Kalau tidak dikirim sama sekali (undefined) → skip, biarkan nilai lama.
       if (key === 'bio') {
         if (value !== undefined) {
-          sanitized[key] = (value === '' || value === null) ? null : value;
+          sanitized[key] = value === '' || value === null ? null : value;
         }
         continue;
       }
@@ -194,11 +194,11 @@ export class UsersService {
         deliverable_url: true,
         projects: {
           select: {
-            id:       true,
-            title:    true,
+            id: true,
+            title: true,
             category: true,
-            tier:     true,
-            skills:   true,
+            tier: true,
+            skills: true,
           },
         },
         users_contracts_business_idTousers: {
@@ -211,22 +211,22 @@ export class UsersService {
     if (contracts.length === 0) {
       return {
         data: {
-          user_id:        userId,
-          user_role:      user.role,
+          user_id: userId,
+          user_role: user.role,
           total_projects: 0,
-          items:          [],
+          items: [],
           summary: {
-            total_completed:    0,
-            total_earnings:     0,
-            unique_categories:  0,
-            average_rating:     null,
+            total_completed: 0,
+            total_earnings: 0,
+            unique_categories: 0,
+            average_rating: null,
           },
         },
         message: 'Belum ada karya tersimpan',
       };
     }
 
-    const contractIds = contracts.map(c => c.id);
+    const contractIds = contracts.map((c) => c.id);
     const reviews = await this.prisma.reviews.findMany({
       where: {
         contract_id: { in: contractIds },
@@ -234,9 +234,9 @@ export class UsersService {
       },
       select: {
         contract_id: true,
-        rating:      true,
-        comment:     true,
-        created_at:  true,
+        rating: true,
+        comment: true,
+        created_at: true,
       },
     });
 
@@ -247,34 +247,36 @@ export class UsersService {
       created_at: Date | null;
     };
     const reviewByContract = new Map<string, ReviewSlim>(
-      reviews.map(r => [r.contract_id, r as ReviewSlim]),
+      reviews.map((r) => [r.contract_id, r]),
     );
 
-    const items = contracts.map(c => {
+    const items = contracts.map((c) => {
       const review = reviewByContract.get(c.id);
       return {
         contract_id: c.id,
         project: {
-          id:       c.projects?.id,
-          title:    c.projects?.title || 'Project',
+          id: c.projects?.id,
+          title: c.projects?.title || 'Project',
           category: c.projects?.category || null,
-          tier:     c.projects?.tier || null,
-          skills:   c.projects?.skills || [],
+          tier: c.projects?.tier || null,
+          skills: c.projects?.skills || [],
         },
         client: {
-          id:         c.users_contracts_business_idTousers?.id,
-          full_name:  c.users_contracts_business_idTousers?.full_name || 'Klien',
+          id: c.users_contracts_business_idTousers?.id,
+          full_name: c.users_contracts_business_idTousers?.full_name || 'Klien',
           avatar_url: c.users_contracts_business_idTousers?.avatar_url || null,
         },
-        budget:       c.agreed_budget,
-        started_at:   c.started_at,
+        budget: c.agreed_budget,
+        started_at: c.started_at,
         completed_at: c.completed_at,
         deliverable_url: c.deliverable_url || null,
-        review: review ? {
-          rating:     review.rating,
-          comment:    review.comment,
-          created_at: review.created_at,
-        } : null,
+        review: review
+          ? {
+              rating: review.rating,
+              comment: review.comment,
+              created_at: review.created_at,
+            }
+          : null,
       };
     });
 
@@ -283,24 +285,26 @@ export class UsersService {
       0,
     );
     const categories = new Set(
-      contracts.map(c => c.projects?.category).filter(Boolean),
+      contracts.map((c) => c.projects?.category).filter(Boolean),
     );
-    const ratedReviews = reviews.filter(r => r.rating != null);
-    const avgRating = ratedReviews.length > 0
-      ? ratedReviews.reduce((s, r) => s + (r.rating || 0), 0) / ratedReviews.length
-      : null;
+    const ratedReviews = reviews.filter((r) => r.rating != null);
+    const avgRating =
+      ratedReviews.length > 0
+        ? ratedReviews.reduce((s, r) => s + (r.rating || 0), 0) /
+          ratedReviews.length
+        : null;
 
     return {
       data: {
-        user_id:        userId,
-        user_role:      user.role,
+        user_id: userId,
+        user_role: user.role,
         total_projects: items.length,
         items,
         summary: {
-          total_completed:   items.length,
-          total_earnings:    totalEarnings,
+          total_completed: items.length,
+          total_earnings: totalEarnings,
           unique_categories: categories.size,
-          average_rating:    avgRating ? Number(avgRating.toFixed(2)) : null,
+          average_rating: avgRating ? Number(avgRating.toFixed(2)) : null,
         },
       },
       message: 'Berhasil',

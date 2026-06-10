@@ -44,7 +44,7 @@ export class AuthService {
   async register(dto: RegisterDto, ctx?: RequestContext) {
     const supabase = this.supabaseService.getClient();
 
-    if (!ALLOWED_REGISTER_ROLES.includes(dto.role as AllowedRegisterRole)) {
+    if (!ALLOWED_REGISTER_ROLES.includes(dto.role)) {
       throw new BadRequestException(
         'Role tidak valid. Hanya mahasiswa atau bisnis yang bisa daftar.',
       );
@@ -74,7 +74,7 @@ export class AuthService {
         // mereka melalui escrow payment, bukan dokumen KTM.
         // Mahasiswa: is_verified = false, harus upload KTM dan tunggu admin approve.
         is_verified: dto.role === 'bisnis' ? true : false,
-        email_verified_at: null,    // email verification belum
+        email_verified_at: null, // email verification belum
         university: dto.university ?? null,
         major: dto.major ?? null,
         semester: dto.semester ?? null,

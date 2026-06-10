@@ -13,7 +13,10 @@ describe('NotificationsService', () => {
         // Mock PrismaService — service tidak akan call DB di test
         { provide: PrismaService, useValue: {} },
         // Mock Gateway — service tidak akan push di test
-        { provide: NotificationsGateway, useValue: { pushToUser: jest.fn(), pushUnreadCount: jest.fn() } },
+        {
+          provide: NotificationsGateway,
+          useValue: { pushToUser: jest.fn(), pushUnreadCount: jest.fn() },
+        },
       ],
     }).compile();
 

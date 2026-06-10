@@ -17,10 +17,11 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { UploadService, UploadType } from './upload.service';
 
 const ALLOWED_EXT_IMAGE_DOC = /^(jpeg|jpg|png|webp|pdf)$/;
+const ALLOWED_EXT_CHAT_IMAGE = /^(jpeg|jpg|png|webp|gif)$/; // image-only utk chat
 const ALLOWED_EXT_DELIVERABLE =
   /^(jpeg|jpg|png|webp|pdf|zip|rar|7z|doc|docx|xls|xlsx|ppt|pptx|csv|txt|md|svg|gif|mp4|mov|mp3|wav|fig|psd|ai|sketch|xd|json)$/;
 
-const MAX_SIZE_DEFAULT     = 10 * 1024 * 1024; // 10 MB
+const MAX_SIZE_DEFAULT = 10 * 1024 * 1024; // 10 MB
 const MAX_SIZE_DELIVERABLE = 50 * 1024 * 1024; // 50 MB
 
 const VALID_TYPES: UploadType[] = [
@@ -29,6 +30,7 @@ const VALID_TYPES: UploadType[] = [
   'selfie',
   'deliverable',
   'evidence',
+  'chat-image',
 ];
 
 @Controller('upload')
@@ -44,20 +46,22 @@ export class UploadController {
       limits: { fileSize: MAX_SIZE_DELIVERABLE },
       fileFilter: (_req, file, cb) => {
         const ext = extname(file.originalname).toLowerCase().replace('.', '');
-        const type = ((_req.body as any)?.type ?? '').toLowerCase();
-        const allowed = type === 'deliverable'
-          ? ALLOWED_EXT_DELIVERABLE
-          : ALLOWED_EXT_IMAGE_DOC;
+        const type = (_req.body?.type ?? '').toLowerCase();
+        const allowed =
+          type === 'deliverable'
+            ? ALLOWED_EXT_DELIVERABLE
+            : type === 'chat-image'
+              ? ALLOWED_EXT_CHAT_IMAGE
+              : ALLOWED_EXT_IMAGE_DOC;
 
         if (!allowed.test(ext)) {
-          return cb(
-            new BadRequestException(
-              type === 'deliverable'
-                ? 'Format file tidak didukung untuk deliverable.'
-                : 'Format tidak didukung. Gunakan JPG, PNG, WEBP, atau PDF.',
-            ),
-            false,
-          );
+          const msg =
+            type === 'deliverable'
+              ? 'Format file tidak didukung untuk deliverable.'
+              : type === 'chat-image'
+                ? 'Format gambar tidak didukung. Gunakan JPG, PNG, WEBP, atau GIF.'
+                : 'Format tidak didukung. Gunakan JPG, PNG, WEBP, atau PDF.';
+          return cb(new BadRequestException(msg), false);
         }
         cb(null, true);
       },
@@ -69,7 +73,7 @@ export class UploadController {
   ) {
     this.uploadService.validateFile(file);
 
-    const type = ((req.body as any)?.type ?? '').toLowerCase() as UploadType;
+    const type = (req.body?.type ?? '').toLowerCase() as UploadType;
 
     if (!VALID_TYPES.includes(type)) {
       throw new BadRequestException(
@@ -94,18 +98,19 @@ export class UploadController {
 
   // ─── GET /upload/signed-url?path=deliverables/userId/file.pdf ──
   @Get('signed-url')
-  async getSignedUrl(
-    @Query('path') path: string,
-    @Req() req: Request,
-  ) {
+  async getSignedUrl(@Query('path') path: string, @Req() req: Request) {
     if (!path) {
       throw new BadRequestException('Path tidak boleh kosong.');
     }
 
-    const requesterId   = (req.user as any)?.id ?? (req.user as any)?.sub;
+    const requesterId = (req.user as any)?.id ?? (req.user as any)?.sub;
     const requesterRole = (req.user as any)?.role;
 
-    const url = await this.uploadService.getSignedUrl(path, requesterId, requesterRole);
+    const url = await this.uploadService.getSignedUrl(
+      path,
+      requesterId,
+      requesterRole,
+    );
     return { data: { url } };
   }
 }

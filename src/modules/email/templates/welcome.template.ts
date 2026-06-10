@@ -31,7 +31,9 @@ export function welcomeTemplate(props: WelcomeEmailProps): {
   const ctaUrl = isStudent
     ? `${props.appUrl}/?tab=verification`
     : `${props.appUrl}/?tab=projects`;
-  const ctaLabel = isStudent ? '🎓 Mulai Verifikasi KTM' : '🏢 Post Project Pertama';
+  const ctaLabel = isStudent
+    ? '🎓 Mulai Verifikasi KTM'
+    : '🏢 Post Project Pertama';
 
   const bodyHtml = `
     <h2 style="margin:0 0 16px 0;font-size:22px;font-weight:800;color:#0f172a">

@@ -12,20 +12,21 @@ export type UploadType =
   | 'ktm'
   | 'selfie'
   | 'deliverable'
-  | 'evidence';
+  | 'evidence'
+  | 'chat-image';
 
 @Injectable()
 export class UploadService {
   private readonly supabase: SupabaseClient;
 
-  private readonly PUBLIC_BUCKET      = 'stairslife-uploads'; // public  (avatars)
-  private readonly PRIVATE_BUCKET     = 'verification';        // private (ktm, selfie)
-  private readonly DELIVERABLE_BUCKET = 'stairslife-private';  // private (deliverables)
+  private readonly PUBLIC_BUCKET = 'stairslife-uploads'; // public  (avatars)
+  private readonly PRIVATE_BUCKET = 'verification'; // private (ktm, selfie)
+  private readonly DELIVERABLE_BUCKET = 'stairslife-private'; // private (deliverables)
 
   constructor(private readonly config: ConfigService) {
     this.supabase = createClient(
-      this.config.get<string>('SUPABASE_URL')!,
-      this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY')!,
+      this.config.get<string>('SUPABASE_URL'),
+      this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY'),
     );
   }
 
@@ -53,9 +54,7 @@ export class UploadService {
 
     // Public bucket → return public URL langsung
     if (bucket === this.PUBLIC_BUCKET) {
-      const { data } = this.supabase.storage
-        .from(bucket)
-        .getPublicUrl(path);
+      const { data } = this.supabase.storage.from(bucket).getPublicUrl(path);
       return data.publicUrl;
     }
 
@@ -123,8 +122,8 @@ export class UploadService {
     if (requesterRole === 'admin') return;
 
     const segments = path.split('/');
-    const folder   = segments[0]; // 'deliverables', 'ktm', 'selfie'
-    const ownerId  = segments[1]; // userId
+    const folder = segments[0]; // 'deliverables', 'ktm', 'selfie'
+    const ownerId = segments[1]; // userId
 
     if (folder === 'deliverables') {
       // Student pemilik file (uploader)
@@ -198,17 +197,27 @@ export class UploadService {
     userId: string,
     originalName: string,
   ): { bucket: string; path: string } {
-    const ext    = originalName.split('.').pop()?.toLowerCase() ?? 'bin';
+    const ext = originalName.split('.').pop()?.toLowerCase() ?? 'bin';
     const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
     const routes: Record<UploadType, { bucket: string; folder: string }> = {
-      avatar:      { bucket: this.PUBLIC_BUCKET,      folder: `avatars/${userId}` },
-      deliverable: { bucket: this.DELIVERABLE_BUCKET, folder: `deliverables/${userId}` },
-      ktm:         { bucket: this.PRIVATE_BUCKET,     folder: `ktm/${userId}` },
-      selfie:      { bucket: this.PRIVATE_BUCKET,     folder: `selfie/${userId}` },
+      avatar: { bucket: this.PUBLIC_BUCKET, folder: `avatars/${userId}` },
+      deliverable: {
+        bucket: this.DELIVERABLE_BUCKET,
+        folder: `deliverables/${userId}`,
+      },
+      ktm: { bucket: this.PRIVATE_BUCKET, folder: `ktm/${userId}` },
+      selfie: { bucket: this.PRIVATE_BUCKET, folder: `selfie/${userId}` },
       // Bukti dispute — bucket privat, hanya pemilik & admin (mediator) yang
       // bisa minta signed URL (lihat authorizeSignedUrlAccess: cabang else).
-      evidence:    { bucket: this.DELIVERABLE_BUCKET, folder: `evidence/${userId}` },
+      evidence: {
+        bucket: this.DELIVERABLE_BUCKET,
+        folder: `evidence/${userId}`,
+      },
+      // Gambar lampiran chat — public bucket supaya bisa di-render <img> langsung
+      // di bubble chat. URL disisipkan ke message.content sebagai markdown
+      // ![image](url). Bucket sama dgn avatar (public, free).
+      'chat-image': { bucket: this.PUBLIC_BUCKET, folder: `chat/${userId}` },
     };
 
     const { bucket, folder } = routes[type];

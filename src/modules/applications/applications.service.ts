@@ -134,9 +134,14 @@ export class ApplicationsService {
       throw new NotFoundException('Lamaran tidak ditemukan');
     }
     if (application.student_id !== studentId) {
-      throw new ForbiddenException('Kamu hanya bisa membatalkan lamaranmu sendiri');
+      throw new ForbiddenException(
+        'Kamu hanya bisa membatalkan lamaranmu sendiri',
+      );
     }
-    if (application.status !== 'pending' && application.status !== 'shortlisted') {
+    if (
+      application.status !== 'pending' &&
+      application.status !== 'shortlisted'
+    ) {
       throw new BadRequestException(
         `Lamaran berstatus "${application.status}" tidak bisa dibatalkan.`,
       );
@@ -218,7 +223,7 @@ export class ApplicationsService {
         // Bulk update status — atomic, lebih cepat dari loop
         await this.prisma.applications.updateMany({
           where: {
-            id: { in: otherApps.map(a => a.id) },
+            id: { in: otherApps.map((a) => a.id) },
           },
           data: { status: 'rejected' as any },
         });
@@ -231,9 +236,9 @@ export class ApplicationsService {
         // createBulk(userIds, payload) — payload sama untuk semua user.
         const rejectReason = `Bisnis sudah memilih kandidat lain untuk project "${project.title}". Tetap semangat, masih banyak project lain! 💪`;
         await this.notificationsService.createBulk(
-          otherApps.map(a => a.student_id),
+          otherApps.map((a) => a.student_id),
           {
-            type: 'application' as any,
+            type: 'application',
             title: 'Lamaran Tidak Diterima',
             body: rejectReason,
             action_url: `/applications`,
@@ -274,9 +279,10 @@ export class ApplicationsService {
       }
     }
 
-    const message = autoRejectedCount > 0
-      ? `Lamaran berhasil di-${dto.status}. ${autoRejectedCount} lamaran lain otomatis ditolak.`
-      : `Lamaran berhasil di-${dto.status}`;
+    const message =
+      autoRejectedCount > 0
+        ? `Lamaran berhasil di-${dto.status}. ${autoRejectedCount} lamaran lain otomatis ditolak.`
+        : `Lamaran berhasil di-${dto.status}`;
 
     return {
       data: updated,

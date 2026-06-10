@@ -23,7 +23,9 @@ describe('RolesGuard', () => {
 
   it('izinkan bila endpoint tidak punya @Roles requirement', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(undefined);
-    expect(guard.canActivate(ctxWith({ id: '1', role: 'mahasiswa' }))).toBe(true);
+    expect(guard.canActivate(ctxWith({ id: '1', role: 'mahasiswa' }))).toBe(
+      true,
+    );
   });
 
   it('izinkan bila role user termasuk yang diizinkan', () => {

@@ -294,4 +294,30 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       isTyping: data.isTyping,
     });
   }
+
+  /* ----------------------------------------------------------------
+     SUPPORT MESSAGE PUSH (WA-style realtime untuk admin chat)
+
+     Dipanggil dari ChatController setelah REST insert berhasil. Mendorong
+     pesan ke personal-room kedua pihak (user pengirim + penerima admin
+     atau sebaliknya) supaya keduanya melihat pesan baru tanpa polling.
+
+     Catatan: support chat tidak pakai 'contract room', tapi push ke
+     personal room user:{id} (sama channel yang kita pakai untuk inbox
+     contract). Ini membuat FE bisa pasang satu listener saja.
+  ---------------------------------------------------------------- */
+  emitSupportMessage(
+    recipientUserId: string,
+    payload: {
+      roomId: string;
+      senderUserId: string;
+      senderRole: 'student' | 'mahasiswa' | 'bisnis' | 'admin';
+      senderName: string;
+      content: string;
+      created_at: string;
+    },
+  ): void {
+    if (!recipientUserId || !this.server) return;
+    this.server.to(`user:${recipientUserId}`).emit('support_message', payload);
+  }
 }

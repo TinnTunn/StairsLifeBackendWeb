@@ -102,7 +102,7 @@ export class NotificationsGateway
       if (!this.userSockets.has(userId)) {
         this.userSockets.set(userId, new Set());
       }
-      this.userSockets.get(userId)!.add(client.id);
+      this.userSockets.get(userId).add(client.id);
 
       void client.join(`user:${userId}`);
 
@@ -138,7 +138,7 @@ export class NotificationsGateway
     this.server.to(`user:${userId}`).emit('new_notification', notif);
 
     if (isOnline) {
-      this.logger.log(`Notif pushed to ${userId} (${sockets!.size} device)`);
+      this.logger.log(`Notif pushed to ${userId} (${sockets.size} device)`);
     }
     return isOnline;
   }

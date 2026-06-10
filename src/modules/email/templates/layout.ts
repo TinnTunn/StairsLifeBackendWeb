@@ -75,7 +75,11 @@ export function ctaButton(args: { url: string; label: string }): string {
  * Penting: nama user bisa berisi `<script>` atau quote.
  */
 export function escapeHtml(s: string): string {
-  return String(s ?? '').replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  return String(s ?? '').replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[
+        c
+      ],
   );
 }

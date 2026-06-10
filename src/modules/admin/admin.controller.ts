@@ -35,7 +35,12 @@ export class AdminController {
   ) {}
 
   private _actorName(user: JwtUser): string {
-    return (user as any).full_name || (user as any).name || (user as any).email || 'Admin';
+    return (
+      (user as any).full_name ||
+      (user as any).name ||
+      (user as any).email ||
+      'Admin'
+    );
   }
 
   // GET /api/v1/admin/stats
@@ -59,8 +64,11 @@ export class AdminController {
   ) {
     const res = await this.adminService.toggleSuspendUser(id, body?.reason);
     void this.audit.log({
-      actorId: user.id, actorName: this._actorName(user),
-      action: 'user.suspend_toggle', targetType: 'user', targetId: id,
+      actorId: user.id,
+      actorName: this._actorName(user),
+      action: 'user.suspend_toggle',
+      targetType: 'user',
+      targetId: id,
       metadata: { reason: body?.reason ?? null },
     });
     return res;
@@ -81,9 +89,15 @@ export class AdminController {
   ) {
     const res = await this.adminService.reviewVerification(id, dto, user.id);
     void this.audit.log({
-      actorId: user.id, actorName: this._actorName(user),
-      action: 'verification.review', targetType: 'verification', targetId: id,
-      metadata: { status: (dto as any).status, rejection_reason: (dto as any).rejection_reason ?? null },
+      actorId: user.id,
+      actorName: this._actorName(user),
+      action: 'verification.review',
+      targetType: 'verification',
+      targetId: id,
+      metadata: {
+        status: (dto as any).status,
+        rejection_reason: (dto as any).rejection_reason ?? null,
+      },
     });
     return res;
   }
@@ -103,9 +117,15 @@ export class AdminController {
   ) {
     const res = await this.adminService.resolveDispute(id, dto, user.id);
     void this.audit.log({
-      actorId: user.id, actorName: this._actorName(user),
-      action: 'dispute.resolve', targetType: 'dispute', targetId: id,
-      metadata: { status: (dto as any).status, outcome: (dto as any).outcome ?? null },
+      actorId: user.id,
+      actorName: this._actorName(user),
+      action: 'dispute.resolve',
+      targetType: 'dispute',
+      targetId: id,
+      metadata: {
+        status: (dto as any).status,
+        outcome: (dto as any).outcome ?? null,
+      },
     });
     return res;
   }
@@ -124,9 +144,14 @@ export class AdminController {
   ) {
     const res = await this.adminService.sendAnnouncement(dto, user.id);
     void this.audit.log({
-      actorId: user.id, actorName: this._actorName(user),
-      action: 'announcement.send', targetType: 'announcement',
-      metadata: { title: (dto as any).title ?? null, target: (dto as any).target ?? null },
+      actorId: user.id,
+      actorName: this._actorName(user),
+      action: 'announcement.send',
+      targetType: 'announcement',
+      metadata: {
+        title: (dto as any).title ?? null,
+        target: (dto as any).target ?? null,
+      },
     });
     return res;
   }
@@ -142,8 +167,11 @@ export class AdminController {
   async deleteProject(@Param('id') id: string, @CurrentUser() user: JwtUser) {
     const res = await this.adminService.deleteProject(id);
     void this.audit.log({
-      actorId: user.id, actorName: this._actorName(user),
-      action: 'project.delete', targetType: 'project', targetId: id,
+      actorId: user.id,
+      actorName: this._actorName(user),
+      action: 'project.delete',
+      targetType: 'project',
+      targetId: id,
     });
     return res;
   }
@@ -174,11 +202,17 @@ export class AdminController {
   }
 
   @Patch('settings')
-  async updateSettings(@Body() body: UpdateSettingsDto, @CurrentUser() user: JwtUser) {
+  async updateSettings(
+    @Body() body: UpdateSettingsDto,
+    @CurrentUser() user: JwtUser,
+  ) {
     const res = await this.adminService.updateSettings(body);
     void this.audit.log({
-      actorId: user.id, actorName: this._actorName(user),
-      action: 'settings.update', targetType: 'settings', metadata: { ...body },
+      actorId: user.id,
+      actorName: this._actorName(user),
+      action: 'settings.update',
+      targetType: 'settings',
+      metadata: { ...body },
     });
     return res;
   }
@@ -205,8 +239,11 @@ export class AdminController {
   async createRole(@Body() dto: CreateRoleDto, @CurrentUser() user: JwtUser) {
     const res = await this.rolesService.create(dto);
     void this.audit.log({
-      actorId: user.id, actorName: this._actorName(user),
-      action: 'role.create', targetType: 'role', targetId: res.data?.id,
+      actorId: user.id,
+      actorName: this._actorName(user),
+      action: 'role.create',
+      targetType: 'role',
+      targetId: res.data?.id,
       metadata: { name: dto.name },
     });
     return res;
@@ -220,8 +257,12 @@ export class AdminController {
   ) {
     const res = await this.rolesService.update(id, dto);
     void this.audit.log({
-      actorId: user.id, actorName: this._actorName(user),
-      action: 'role.update', targetType: 'role', targetId: id, metadata: { ...dto },
+      actorId: user.id,
+      actorName: this._actorName(user),
+      action: 'role.update',
+      targetType: 'role',
+      targetId: id,
+      metadata: { ...dto },
     });
     return res;
   }
@@ -230,8 +271,11 @@ export class AdminController {
   async deleteRole(@Param('id') id: string, @CurrentUser() user: JwtUser) {
     const res = await this.rolesService.remove(id);
     void this.audit.log({
-      actorId: user.id, actorName: this._actorName(user),
-      action: 'role.delete', targetType: 'role', targetId: id,
+      actorId: user.id,
+      actorName: this._actorName(user),
+      action: 'role.delete',
+      targetType: 'role',
+      targetId: id,
     });
     return res;
   }

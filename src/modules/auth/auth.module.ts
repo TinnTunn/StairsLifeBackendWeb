@@ -24,20 +24,10 @@ import { EmailModule } from '../email/email.module';
         return { secret, signOptions: { expiresIn } };
       },
     }),
-    EmailModule,    // global, sudah ada
+    EmailModule, // global, sudah ada
   ],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    TokenService,
-    VerificationTokenService,
-    JwtStrategy,
-  ],
-  exports: [
-    AuthService,
-    TokenService,
-    JwtModule,
-    PassportModule,
-  ],
+  providers: [AuthService, TokenService, VerificationTokenService, JwtStrategy],
+  exports: [AuthService, TokenService, JwtModule, PassportModule],
 })
 export class AuthModule {}

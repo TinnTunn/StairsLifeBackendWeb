@@ -206,7 +206,12 @@ export class WithdrawalsService {
     return {
       data: {
         items,
-        pagination: { page, limit, total, total_pages: Math.ceil(total / limit) },
+        pagination: {
+          page,
+          limit,
+          total,
+          total_pages: Math.ceil(total / limit),
+        },
       },
       message: 'Berhasil',
     };
@@ -289,7 +294,10 @@ export class WithdrawalsService {
       action_url: `/wallet`,
     });
 
-    return { data: { id: wd.id, status: 'rejected' }, message: 'Penarikan ditolak' };
+    return {
+      data: { id: wd.id, status: 'rejected' },
+      message: 'Penarikan ditolak',
+    };
   }
 
   private async _approveManual(wd: any, adminId: string) {
@@ -378,7 +386,7 @@ export class WithdrawalsService {
         processed_by: adminId,
         processed_at: new Date(),
         xendit_disbursement_id: disbursement.id,
-        xendit_payload: disbursement as any,
+        xendit_payload: disbursement,
       },
     });
 
@@ -392,7 +400,11 @@ export class WithdrawalsService {
     });
 
     return {
-      data: { id: wd.id, status: 'processing', disbursement_id: disbursement.id },
+      data: {
+        id: wd.id,
+        status: 'processing',
+        disbursement_id: disbursement.id,
+      },
       message: 'Disbursement Xendit dikirim. Menunggu konfirmasi.',
     };
   }

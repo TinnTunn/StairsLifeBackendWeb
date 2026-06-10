@@ -15,6 +15,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SupabaseService } from '../../config/supabase.config';
 import { ChatService } from './chat.service';
+import { ChatGateway } from './chat.gateway';
 import { IsString, IsNotEmpty, IsUUID } from 'class-validator';
 
 class SendMessageDto {
@@ -38,6 +39,7 @@ export class ChatController {
   constructor(
     private supabase: SupabaseService,
     private chatService: ChatService,
+    private chatGateway: ChatGateway,
   ) {}
 
   @Get('rooms')
@@ -130,6 +132,40 @@ export class ChatController {
       .single();
 
     if (error) throw new Error(error.message);
+
+    // WA-style realtime: push ke SEMUA admin yang sedang online supaya
+    // admin inbox + room mereka update tanpa polling. Kita ambil daftar
+    // admin dari tabel users (sedikit; admin biasanya < 5 orang).
+    const { data: admins } = await supabase
+      .from('users')
+      .select('id')
+      .eq('role', 'admin');
+    const senderName =
+      (data as { sender?: { full_name?: string } })?.sender?.full_name ||
+      (user as { full_name?: string }).full_name ||
+      'Pengguna';
+    const createdAt =
+      (data as { created_at?: string })?.created_at ?? new Date().toISOString();
+    for (const a of admins || []) {
+      this.chatGateway.emitSupportMessage(a.id, {
+        roomId,
+        senderUserId: user.id,
+        senderRole: user.role as 'student' | 'mahasiswa' | 'bisnis',
+        senderName,
+        content: dto.content,
+        created_at: createdAt,
+      });
+    }
+    // Echo balik ke pengirim juga (di tab lain dia bisa lihat update).
+    this.chatGateway.emitSupportMessage(user.id, {
+      roomId,
+      senderUserId: user.id,
+      senderRole: user.role as 'student' | 'mahasiswa' | 'bisnis',
+      senderName,
+      content: dto.content,
+      created_at: createdAt,
+    });
+
     return { data, message: 'Pesan terkirim' };
   }
 
@@ -189,6 +225,37 @@ export class ChatController {
       .single();
 
     if (error) throw new Error(error.message);
+
+    // WA-style realtime: roomId untuk support = "support-{userId}", jadi user
+    // pemilik room = potongan setelah prefix. Push ke dia supaya layar chat-nya
+    // langsung tampilkan balasan admin tanpa polling.
+    const recipientUserId = roomId.replace(/^support-/, '');
+    const senderName =
+      (data as { sender?: { full_name?: string } })?.sender?.full_name ||
+      (user as { full_name?: string }).full_name ||
+      'Admin Support';
+    const createdAt =
+      (data as { created_at?: string })?.created_at ?? new Date().toISOString();
+    if (recipientUserId) {
+      this.chatGateway.emitSupportMessage(recipientUserId, {
+        roomId,
+        senderUserId: user.id,
+        senderRole: 'admin',
+        senderName,
+        content: dto.content,
+        created_at: createdAt,
+      });
+    }
+    // Echo ke admin sendiri (kalau ada tab lain terbuka)
+    this.chatGateway.emitSupportMessage(user.id, {
+      roomId,
+      senderUserId: user.id,
+      senderRole: 'admin',
+      senderName,
+      content: dto.content,
+      created_at: createdAt,
+    });
+
     return { data, message: 'Balasan terkirim' };
   }
 
@@ -439,6 +506,26 @@ export class ChatController {
     // Notif ke receiver — non-blocking, kalau gagal tidak mempengaruhi response
     void this.chatService.notifyInquiry?.(otherUserId, user, dto.content);
 
+    // WA-style realtime: push WS event ke kedua pihak supaya inquiry chat
+    // langsung update tanpa polling. Pakai event 'support_message' karena
+    // payload-nya identik (FE listener sudah tangani berdasarkan roomId).
+    const senderName =
+      (data as { sender?: { full_name?: string } })?.sender?.full_name ||
+      (user as { full_name?: string }).full_name ||
+      'Pengguna';
+    const createdAt =
+      (data as { created_at?: string })?.created_at ?? new Date().toISOString();
+    const payload = {
+      roomId,
+      senderUserId: user.id,
+      senderRole: user.role as 'student' | 'mahasiswa' | 'bisnis' | 'admin',
+      senderName,
+      content: dto.content,
+      created_at: createdAt,
+    };
+    this.chatGateway.emitSupportMessage(otherUserId, payload);
+    this.chatGateway.emitSupportMessage(user.id, payload);
+
     return { data, message: 'Pesan terkirim' };
   }
 
@@ -450,10 +537,12 @@ export class ChatController {
     // Format: inquiry-{a}-{b} dimana a/b adalah UUID
     const { data: messages } = await supabase
       .from('support_messages')
-      .select(`
+      .select(
+        `
         id, room_id, content, created_at, sender_id,
         sender:users!sender_id (id, full_name, role, avatar_url)
-      `)
+      `,
+      )
       .like('room_id', 'inquiry-%')
       .or(`room_id.like.%${user.id}%`)
       .order('created_at', { ascending: false });
@@ -536,7 +625,9 @@ export class ChatController {
     const isAdmin = user.role === 'admin';
 
     if (!isParticipant && !isAdmin) {
-      throw new ForbiddenException('Kamu tidak punya akses ke ruang mediasi ini');
+      throw new ForbiddenException(
+        'Kamu tidak punya akses ke ruang mediasi ini',
+      );
     }
     return dispute as any;
   }
@@ -558,7 +649,11 @@ export class ChatController {
 
     if (error) throw new Error(error.message);
     return {
-      data: { room_id: roomId, dispute_id: disputeId, messages: messages || [] },
+      data: {
+        room_id: roomId,
+        dispute_id: disputeId,
+        messages: messages || [],
+      },
       message: 'Berhasil',
     };
   }

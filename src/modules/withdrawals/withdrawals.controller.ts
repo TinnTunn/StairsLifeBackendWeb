@@ -48,10 +48,7 @@ export class WithdrawalsController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('mahasiswa')
-  async create(
-    @Body() dto: CreateWithdrawalDto,
-    @CurrentUser() user: JwtUser,
-  ) {
+  async create(@Body() dto: CreateWithdrawalDto, @CurrentUser() user: JwtUser) {
     return this.withdrawalsService.create(user.id, dto);
   }
 

@@ -78,7 +78,7 @@ export class ChatService {
       .select('student_id, business_id')
       .eq('id', contractId)
       .maybeSingle();
-    return (data as { student_id: string; business_id: string } | null) ?? null;
+    return data ?? null;
   }
 
   async validateContractAccess(
@@ -110,18 +110,17 @@ export class ChatService {
 
     const senderName = sender.full_name || 'Seseorang';
     // Truncate content supaya body notif tidak terlalu panjang
-    const preview = content.length > 80
-      ? content.substring(0, 77) + '...'
-      : content;
+    const preview =
+      content.length > 80 ? content.substring(0, 77) + '...' : content;
 
     await this.notificationsService.create({
-      user_id:    receiverId,
+      user_id: receiverId,
       // Pakai 'system' karena enum notification_type tidak punya 'inquiry'.
       // Title yang descriptive sudah cukup untuk membedakan dari notif lain.
-      type:       'system',
-      title:      `💬 Pesan baru dari ${senderName}`,
-      body:       preview,
-      ref_id:     sender.id,
+      type: 'system',
+      title: `💬 Pesan baru dari ${senderName}`,
+      body: preview,
+      ref_id: sender.id,
       action_url: `/chat/inquiry/${sender.id}`,
     });
   }

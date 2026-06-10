@@ -12,10 +12,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../../config/prisma.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
-import {
-  XenditService,
-  XenditInvoiceWebhook,
-} from '../xendit/xendit.service';
+import { XenditService, XenditInvoiceWebhook } from '../xendit/xendit.service';
 
 const DEFAULT_PLATFORM_FEE_PERCENT = 5;
 const FEE_CACHE_TTL_MS = 60_000;
@@ -239,7 +236,7 @@ export class PaymentsService {
         xendit_invoice_id: invoice.id,
         xendit_invoice_url: invoice.invoice_url,
         expires_at: new Date(invoice.expiry_date),
-        xendit_payload: invoice as any,
+        xendit_payload: invoice,
       },
     });
 
@@ -375,7 +372,7 @@ export class PaymentsService {
     // Notif ke mahasiswa: dana sudah aman di escrow
     const feePercent = await this._getPlatformFeePercent();
     void this.notificationsService.create({
-      user_id: payment.payee_id!,
+      user_id: payment.payee_id,
       type: 'payment',
       title: '🔒 Dana di Escrow',
       body: `Klien sudah membayar Rp ${payment.amount.toLocaleString('id-ID')}. Setelah deliverable disetujui, kamu menerima Rp ${payment.net_amount.toLocaleString('id-ID')} (fee platform ${feePercent}%).`,
@@ -385,7 +382,7 @@ export class PaymentsService {
 
     // Notif ke bisnis: konfirmasi pembayaran
     void this.notificationsService.create({
-      user_id: payment.payer_id!,
+      user_id: payment.payer_id,
       type: 'payment',
       title: '✅ Pembayaran Berhasil',
       body: `Pembayaran Rp ${payment.amount.toLocaleString('id-ID')} via ${payload.payment_channel || payload.payment_method || 'Xendit'} berhasil. Dana akan dilepas ke mahasiswa setelah deliverable disetujui.`,
@@ -409,7 +406,7 @@ export class PaymentsService {
     this.logger.log(`Payment ${paymentId} marked EXPIRED`);
 
     void this.notificationsService.create({
-      user_id: payment.payer_id!,
+      user_id: payment.payer_id,
       type: 'payment',
       title: '⏰ Invoice Expired',
       body: `Invoice pembayaran sudah expired. Silakan generate invoice baru di halaman kontrak.`,
@@ -434,7 +431,11 @@ export class PaymentsService {
     const existing = await this.paymentsRepository.findByContractId(
       dto.contract_id,
     );
-    if (existing && existing.status !== 'expired' && existing.status !== 'failed') {
+    if (
+      existing &&
+      existing.status !== 'expired' &&
+      existing.status !== 'failed'
+    ) {
       throw new ConflictException('Pembayaran untuk kontrak ini sudah ada');
     }
 
@@ -546,7 +547,7 @@ export class PaymentsService {
     }
 
     void this.notificationsService.create({
-      user_id: payment.payee_id!,
+      user_id: payment.payee_id,
       type: 'payment',
       title: '💰 Dana Cair!',
       body: `Rp ${payment.net_amount.toLocaleString('id-ID')} sudah masuk saldo kamu. Tarik ke rekening lewat menu Dompet.`,
@@ -572,7 +573,12 @@ export class PaymentsService {
     userId: string,
     amount: number,
     txMeta: {
-      type: 'earn_release' | 'earn_split' | 'withdrawal_lock' | 'withdrawal_done' | 'withdrawal_refund';
+      type:
+        | 'earn_release'
+        | 'earn_split'
+        | 'withdrawal_lock'
+        | 'withdrawal_done'
+        | 'withdrawal_refund';
       ref_type?: string;
       ref_id?: string;
       description?: string;
@@ -720,7 +726,7 @@ export class PaymentsService {
       id: invoice.id,
       external_id: invoice.external_id,
       user_id: invoice.user_id,
-      status: invoice.status === 'SETTLED' ? 'PAID' : (invoice.status as any),
+      status: invoice.status === 'SETTLED' ? 'PAID' : invoice.status,
       merchant_name: invoice.merchant_name,
       amount: invoice.amount,
       payer_email: invoice.payer_email,

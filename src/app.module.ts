@@ -41,7 +41,7 @@ import { WithdrawalsModule } from './modules/withdrawals/withdrawals.module';
     ]),
 
     DatabaseModule,
-    XenditModule,       // Global — harus sebelum PaymentsModule & WithdrawalsModule
+    XenditModule, // Global — harus sebelum PaymentsModule & WithdrawalsModule
     AuthModule,
     UsersModule,
     ProjectsModule,
@@ -59,8 +59,6 @@ import { WithdrawalsModule } from './modules/withdrawals/withdrawals.module';
     EmailModule,
   ],
   controllers: [],
-  providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
-  ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

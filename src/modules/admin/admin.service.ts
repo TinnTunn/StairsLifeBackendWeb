@@ -354,7 +354,8 @@ export class AdminService {
           status: dto.status,
           admin_notes: dto.admin_notes ?? null,
           resolved_by: dto.status === DisputeStatus.REJECTED ? adminId : null,
-          resolved_at: dto.status === DisputeStatus.REJECTED ? new Date() : null,
+          resolved_at:
+            dto.status === DisputeStatus.REJECTED ? new Date() : null,
         },
       });
 
@@ -384,11 +385,7 @@ export class AdminService {
 
     // Kalau payment sudah released/refunded sebelumnya, tolak — admin
     // tidak boleh ulangi efek finansial.
-    if (
-      needsPayment &&
-      payment &&
-      payment.status !== 'held'
-    ) {
+    if (needsPayment && payment && payment.status !== 'held') {
       throw new BadRequestException(
         `Payment sudah dalam status "${payment.status}", tidak bisa diubah lagi oleh dispute resolution.`,
       );
@@ -410,15 +407,15 @@ export class AdminService {
         );
       }
       // Hitung dari net (bukan gross): platform fee tetap dipotong.
-      const net = payment!.net_amount;
+      const net = payment.net_amount;
       studentShare = Math.round((net * pct) / 100);
       businessShare = net - studentShare;
     } else if (outcome === DisputeOutcome.FAVOR_STUDENT) {
-      studentShare = payment!.net_amount;
+      studentShare = payment.net_amount;
       businessShare = 0;
     } else if (outcome === DisputeOutcome.FAVOR_BUSINESS) {
       studentShare = 0;
-      businessShare = payment!.net_amount;
+      businessShare = payment.net_amount;
     }
 
     // Status baru untuk payment.
@@ -459,7 +456,8 @@ export class AdminService {
                 ? now
                 : null,
             refunded_at:
-              newPaymentStatus === 'refunded' || newPaymentStatus === 'split_settled'
+              newPaymentStatus === 'refunded' ||
+              newPaymentStatus === 'split_settled'
                 ? now
                 : null,
           },
@@ -470,9 +468,9 @@ export class AdminService {
         // ter-update sehingga mahasiswa tidak dapat saldo dari dispute split.
         if (studentShare > 0) {
           const wallet = await tx.wallets.upsert({
-            where: { user_id: contract!.student_id },
+            where: { user_id: contract.student_id },
             update: {},
-            create: { user_id: contract!.student_id },
+            create: { user_id: contract.student_id },
           });
           await tx.wallets.update({
             where: { id: wallet.id },
@@ -485,9 +483,11 @@ export class AdminService {
           await tx.wallet_transactions.create({
             data: {
               wallet_id: wallet.id,
-              user_id: contract!.student_id,
+              user_id: contract.student_id,
               type:
-                outcome === DisputeOutcome.SPLIT ? 'earn_split' : 'earn_release',
+                outcome === DisputeOutcome.SPLIT
+                  ? 'earn_split'
+                  : 'earn_release',
               amount: BigInt(studentShare),
               ref_type: 'dispute',
               ref_id: disputeId,
@@ -584,7 +584,9 @@ export class AdminService {
 
     const projectTitle = contract.projects?.title || 'project';
     const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
-    const note = adminNotes ? ` Catatan admin: ${adminNotes.slice(0, 120)}` : '';
+    const note = adminNotes
+      ? ` Catatan admin: ${adminNotes.slice(0, 120)}`
+      : '';
 
     let studentMsg: string;
     let businessMsg: string;
@@ -721,10 +723,7 @@ export class AdminService {
       );
     } catch (e) {
       // Tidak fatal — announcement tetap tersimpan di DB
-      console.warn(
-        '[announcement] fan-out gagal:',
-        (e as Error).message,
-      );
+      console.warn('[announcement] fan-out gagal:', (e as Error).message);
     }
 
     return { data: announcement, message: 'Announcement berhasil dikirim' };
@@ -871,7 +870,10 @@ export class AdminService {
     };
   }
 
-  async updateSettings(payload: { platform_fee?: number; verification_sla_days?: number }) {
+  async updateSettings(payload: {
+    platform_fee?: number;
+    verification_sla_days?: number;
+  }) {
     const updates = [];
 
     if (payload.platform_fee !== undefined) {

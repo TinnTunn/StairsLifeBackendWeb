@@ -23,7 +23,7 @@ import * as crypto from 'crypto';
 
 const TOKEN_BYTES = 32;
 const TTL_EMAIL_VERIFICATION_MS = 24 * 60 * 60 * 1000; // 24 jam
-const TTL_PASSWORD_RESET_MS = 60 * 60 * 1000;          // 1 jam
+const TTL_PASSWORD_RESET_MS = 60 * 60 * 1000; // 1 jam
 
 export type TokenType = 'email_verification' | 'password_reset';
 

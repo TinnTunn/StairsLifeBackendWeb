@@ -1,4 +1,8 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 
 /**
  * XenditService — wrapper minimalist untuk Xendit REST API.
@@ -242,7 +246,7 @@ export class XenditService {
    */
   async createDisbursement(params: {
     externalId: string;
-    bankCode: string;          // "BCA", "BNI", ...
+    bankCode: string; // "BCA", "BNI", ...
     accountHolderName: string;
     accountNumber: string;
     description: string;
@@ -291,8 +295,8 @@ export interface XenditInvoice {
   updated: string;
   // Field di bawah baru ada setelah status PAID:
   paid_at?: string;
-  payment_method?: string;     // "BANK_TRANSFER" | "EWALLET" | "QR_CODE" | "RETAIL_OUTLET" | "CREDIT_CARD"
-  payment_channel?: string;    // "BCA" | "OVO" | "DANA" | ...
+  payment_method?: string; // "BANK_TRANSFER" | "EWALLET" | "QR_CODE" | "RETAIL_OUTLET" | "CREDIT_CARD"
+  payment_channel?: string; // "BCA" | "OVO" | "DANA" | ...
   payment_destination?: string;
   paid_amount?: number;
   currency: string;
