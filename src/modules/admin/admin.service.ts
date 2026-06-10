@@ -120,6 +120,12 @@ export class AdminService {
         is_suspended: true,
         suspension_reason: true,
         created_at: true,
+        // Profil untuk tampilan admin (foto + konteks)
+        avatar_url: true,
+        university: true,
+        major: true,
+        company_name: true,
+        phone: true,
       },
       orderBy: { created_at: 'desc' },
     });
@@ -169,11 +175,27 @@ export class AdminService {
     };
   }
 
-  async deleteUser(userId: string) {
-    const user = await this.prisma.users.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('User tidak ditemukan');
-    await this.prisma.users.delete({ where: { id: userId } });
-    return { data: null, message: 'Akun berhasil dihapus' };
+  async deleteProject(projectId: string) {
+    const project = await this.prisma.projects.findUnique({
+      where: { id: projectId },
+    });
+    if (!project) throw new NotFoundException('Project tidak ditemukan');
+
+    // Project yang sudah punya kontrak = ada engagement + (mungkin) pembayaran.
+    // Hard-delete akan melanggar FK kontrak (onDelete: NoAction) & menghapus
+    // riwayat. Tolak — minta admin selesaikan/batalkan kontraknya dulu.
+    const contractCount = await this.prisma.contracts.count({
+      where: { project_id: projectId },
+    });
+    if (contractCount > 0) {
+      throw new BadRequestException(
+        'Project ini sudah punya kontrak — tidak bisa dihapus. Selesaikan/batalkan kontraknya dulu.',
+      );
+    }
+
+    // Aman dihapus: lamaran (applications) ber-onDelete Cascade ikut terhapus.
+    await this.prisma.projects.delete({ where: { id: projectId } });
+    return { data: { id: projectId }, message: 'Project berhasil dihapus' };
   }
 
   // ═══════════════════════════════

@@ -137,12 +137,13 @@ export class AdminController {
     return this.adminService.getAnnouncements();
   }
 
-  @Delete('users/:id')
-  async deleteUser(@Param('id') id: string, @CurrentUser() user: JwtUser) {
-    const res = await this.adminService.deleteUser(id);
+  // DELETE /api/v1/admin/projects/:id — hapus project (moderasi admin)
+  @Delete('projects/:id')
+  async deleteProject(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+    const res = await this.adminService.deleteProject(id);
     void this.audit.log({
       actorId: user.id, actorName: this._actorName(user),
-      action: 'user.delete', targetType: 'user', targetId: id,
+      action: 'project.delete', targetType: 'project', targetId: id,
     });
     return res;
   }
