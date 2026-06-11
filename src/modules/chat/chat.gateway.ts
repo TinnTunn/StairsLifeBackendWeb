@@ -320,4 +320,37 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!recipientUserId || !this.server) return;
     this.server.to(`user:${recipientUserId}`).emit('support_message', payload);
   }
+
+  /**
+   * Emit pesan kontrak ke room kontrak + push chat_inbox ke penerima.
+   *
+   * Dipanggil dari REST `POST /chat/:contractId/messages` sebagai fallback
+   * saat WS pengirim down — supaya penerima tetap dapat realtime push
+   * walau pengirim pakai REST. Tanpa method ini, REST send berhasil simpan
+   * pesan tapi penerima TIDAK pernah ter-notif sampai mereka refresh manual.
+   */
+  emitContractMessage(
+    contractId: string,
+    message: unknown,
+    senderId: string,
+    recipientId: string | null,
+    senderName: string,
+  ): void {
+    if (!contractId || !this.server) return;
+    const roomName = `contract:${contractId}`;
+    this.server.to(roomName).emit('new_message', { contractId, message });
+    if (recipientId && recipientId !== senderId) {
+      const content =
+        (message as { content?: string })?.content?.toString() ?? '';
+      const createdAt =
+        (message as { created_at?: string })?.created_at ??
+        new Date().toISOString();
+      this.server.to(`user:${recipientId}`).emit('chat_inbox', {
+        contractId,
+        preview: content.slice(0, 140),
+        senderName: senderName || 'Seseorang',
+        created_at: createdAt,
+      });
+    }
+  }
 }

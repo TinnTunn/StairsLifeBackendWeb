@@ -320,6 +320,21 @@ export class ChatController {
       .order('created_at', { ascending: true });
 
     if (error) throw new Error(error.message);
+
+    // BUG FIX: auto-mark sebagai dibaca saat user fetch history via REST.
+    // Skenario yg ditutup: kalau WS tidak konek, joinRoom tidak fire →
+    // markAsRead WS gateway tidak jalan → badge unread tetap walau user
+    // sudah lihat pesan. Cabang fallback REST sekarang juga mark-read.
+    // Admin di-skip supaya tidak menandai pesan sebagai dibaca saat
+    // sekadar audit/mediasi.
+    if (user.role !== 'admin') {
+      try {
+        await this.chatService.markAsRead(contractId, user.id);
+      } catch (_) {
+        // Non-fatal — fetch tetap success, mark-read bisa retry next time.
+      }
+    }
+
     return { data, message: 'Berhasil' };
   }
 
@@ -354,6 +369,36 @@ export class ChatController {
       .single();
 
     if (error) throw new Error(error.message);
+
+    // BUG FIX: REST send DULU cuma simpan ke DB tanpa emit WS event. Akibat:
+    // kalau WS pengirim down → fallback REST jalan, tapi penerima TIDAK
+    // pernah dapat realtime push → pesan baru "hilang" sampai refresh.
+    // Sekarang: setelah simpan, emit WS event yang sama seperti via gateway
+    // → penerima dapat new_message (kalau di room) atau chat_inbox (kalau di
+    // daftar chat), persis sama dgn jalur WS.
+    try {
+      const parties = await this.chatService.getContractParties(contractId);
+      const recipientId = parties
+        ? (parties.student_id === user.id
+            ? parties.business_id
+            : parties.student_id)
+        : null;
+      const senderName =
+        (data as { sender?: { full_name?: string } })?.sender?.full_name ||
+        (user as { full_name?: string }).full_name ||
+        'Seseorang';
+      this.chatGateway.emitContractMessage(
+        contractId,
+        data,
+        user.id,
+        recipientId,
+        senderName,
+      );
+    } catch {
+      // Non-fatal — simpan sudah berhasil. Push realtime gagal tidak boleh
+      // membatalkan response. User bisa refresh untuk lihat.
+    }
+
     return { data, message: 'Pesan terkirim' };
   }
 
